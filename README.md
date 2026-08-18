@@ -5,17 +5,19 @@ Smart Guide - Stage of development (25.06.2026)
 
 Status
 
-✅ Home Assistant Verbindung
+✅ Home Assistant Verbindung (live, gegen echte Instanzen erkannt)
 ✅ Token speichern
 ✅ Geräteanalyse
 ✅ Entscheidungsbaum
+✅ Gerätedatenbank (4.372 echte Geräte importiert)
+✅ Zigbee-Erkennung (inkl. Pairing-Aktivierung mit Erfolgsverifikation)
+✅ MQTT-Erkennung
 
-🚧 Gerätedatenbank
-🚧 Zigbee-Erkennung
-🚧 MQTT-Erkennung
+🚧 Matter- / Z-Wave-Unterstützung
+🚧 Aufräumen der alten statischen Geräteliste (Fallback-Altlast)
 
 📅 Nächstes Ziel:
-Erste vollständige Geräteintegration
+Breitere Protokoll-Unterstützung über Zigbee hinaus (Matter, Z-Wave)
 
 
 # Home Assistant Integration Assistant
@@ -24,7 +26,7 @@ Erste vollständige Geräteintegration
 
 Home Assistant is one of the most powerful smart home platforms available today. However, many users struggle with the complexity of device integration, protocols, infrastructure setup, and troubleshooting.
 
-The goal of this project is to provide an AI-guided integration assistant that helps users successfully build and operate their smart home environments.
+The goal of this project is to provide a guided integration assistant that helps users successfully build and operate their smart home environments.
 
 ---
 
@@ -55,61 +57,34 @@ This creates a significant barrier for new users.
 
 ## The Solution
 
-The Integration Assistant guides users step by step.
+The Integration Assistant guides users step by step through a device knowledge base of over 4,000 real devices, combined with a live read of the user's actual Home Assistant setup — so the guidance is based on what's really installed, not on what the user thinks is installed.
 
-Example:
+Example flow:
 
-User:
-
-> I want to connect an IKEA lamp.
-
-Assistant:
-
-> Which model?
-
-User:
-
-> TRÅDFRI
-
-Assistant:
-
-> I detected:
->
-> * Home Assistant
-> * MQTT
-> * Zigbee2MQTT
->
-> Would you like me to enable pairing mode?
+1. Select device category (e.g. Light)
+2. Select manufacturer (e.g. IKEA)
+3. Select model (e.g. TRÅDFRI)
+4. The assistant detects the real infrastructure: Home Assistant, MQTT, Zigbee2MQTT
+5. The assistant activates pairing mode and confirms it actually took effect
+6. Newly appeared devices are surfaced automatically
 
 ---
 
 ## Development Phases
 
-### Phase 1 – Device Integration
+### Phase 1 – Device Integration ✅ Largely complete
 
 Goal:
 
 Help users integrate individual devices.
 
-Examples:
+Status: guided flow, live device database, live infrastructure detection, and verified Zigbee pairing activation are all implemented and running.
 
-* Lamps
-* Switches
-* Sensors
-* Motion detectors
-
-### Phase 2 – Protocol Integration
+### Phase 2 – Protocol Integration (in progress)
 
 Goal:
 
-Help users deploy technologies.
-
-Examples:
-
-* MQTT
-* Zigbee2MQTT
-* Matter
-* Z-Wave
+Help users deploy technologies beyond Zigbee — Matter, Z-Wave.
 
 ### Phase 3 – Infrastructure Planning
 
