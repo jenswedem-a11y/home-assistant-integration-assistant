@@ -1,0 +1,5 @@
+data/ha_config.json
+data/postgres/
+.env
+.env.*
+!.env.example

@@ -1,0 +1,30 @@
+services:
+  smartguide-app:
+    build: .
+    container_name: smartguide-app
+    restart: unless-stopped
+    depends_on:
+      - smartguide-postgres
+    environment:
+      HOME_ASSISTANT_URL: ${HOME_ASSISTANT_URL:-}
+      HOME_ASSISTANT_TOKEN: ${HOME_ASSISTANT_TOKEN:-}
+      SMARTGUIDE_DATABASE_URL: postgresql://smartguide:${SMARTGUIDE_POSTGRES_PASSWORD:-smartguide}@smartguide-postgres:5432/smartguide
+    volumes:
+      - ./data:/app/data
+    ports:
+      - "8095:8080"
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+
+  smartguide-postgres:
+    image: postgres:16
+    container_name: smartguide-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: smartguide
+      POSTGRES_USER: smartguide
+      POSTGRES_PASSWORD: ${SMARTGUIDE_POSTGRES_PASSWORD:-smartguide}
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+      - ./db-init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "5433:5432"

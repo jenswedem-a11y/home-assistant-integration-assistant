@@ -1,0 +1,111 @@
+[
+  {
+    "vendor": "Tuya",
+    "model": "TS011F_plug_1",
+    "description": "Smart plug with power monitoring",
+    "category": "plug",
+    "zigbeeModel": ["TS011F"],
+    "fingerprint": [
+      {
+        "modelID": "TS011F",
+        "manufacturerName": "_TZ3000_gjnozsaz"
+      }
+    ],
+    "whiteLabel": [
+      {
+        "vendor": "BlitzWolf",
+        "model": "BW-SHP13",
+        "description": "Smart plug"
+      }
+    ],
+    "exposes": [
+      {
+        "type": "binary",
+        "property": "state",
+        "name": "state",
+        "value_on": "ON",
+        "value_off": "OFF"
+      },
+      {
+        "type": "numeric",
+        "property": "power",
+        "name": "power",
+        "unit": "W"
+      },
+      {
+        "type": "numeric",
+        "property": "energy",
+        "name": "energy",
+        "unit": "kWh"
+      }
+    ],
+    "ota": true,
+    "source_url": "https://www.zigbee2mqtt.io/devices/TS011F_plug_1.html"
+  },
+  {
+    "vendor": "IKEA",
+    "model": "E1743",
+    "description": "TRADFRI on/off switch",
+    "category": "switch",
+    "zigbeeModel": ["TRADFRI on/off switch"],
+    "fingerprint": [
+      {
+        "modelID": "TRADFRI on/off switch",
+        "manufacturerName": "IKEA of Sweden"
+      }
+    ],
+    "exposes": [
+      {
+        "type": "enum",
+        "property": "action",
+        "name": "action",
+        "values": ["on", "off", "brightness_move_up", "brightness_move_down", "brightness_stop"]
+      },
+      {
+        "type": "numeric",
+        "property": "battery",
+        "name": "battery",
+        "unit": "%"
+      }
+    ],
+    "ota": true,
+    "source_url": "https://www.zigbee2mqtt.io/devices/E1743.html"
+  },
+  {
+    "vendor": "Aqara",
+    "model": "RTCGQ11LM",
+    "display_name": "Aqara Motion Sensor",
+    "description": "Motion sensor with illuminance",
+    "category": "sensor",
+    "zigbeeModel": ["lumi.sensor_motion.aq2"],
+    "fingerprint": [
+      {
+        "modelID": "lumi.sensor_motion.aq2",
+        "manufacturerName": "LUMI"
+      }
+    ],
+    "exposes": [
+      {
+        "type": "binary",
+        "property": "occupancy",
+        "name": "occupancy",
+        "value_on": true,
+        "value_off": false
+      },
+      {
+        "type": "numeric",
+        "property": "illuminance_lux",
+        "name": "illuminance",
+        "unit": "lx"
+      },
+      {
+        "type": "numeric",
+        "property": "battery",
+        "name": "battery",
+        "unit": "%"
+      }
+    ],
+    "ota": false,
+    "source_url": "https://www.zigbee2mqtt.io/devices/RTCGQ11LM.html"
+  }
+]

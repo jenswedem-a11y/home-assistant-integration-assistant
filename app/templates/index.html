@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Smart Guide</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v={{ app_version }}" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <main class="content">
+        <section class="topbar">
+          <div>
+            <a class="brand" href="/" aria-label="Smart Guide Start">
+              <span class="brand-mark">SG</span>
+              <span>
+                <strong>Smart Guide</strong>
+                <small>Entscheidungsassistent</small>
+              </span>
+            </a>
+            <p class="eyebrow">Home Assistant Orientierung</p>
+            <h1>Finde zuerst den richtigen Integrationsweg</h1>
+          </div>
+          <div class="status-pill">
+            <span class="pulse"></span>
+            Analyse bereit
+          </div>
+        </section>
+
+        <section class="dashboard">
+          <section class="analysis-panel" id="haAnalysisPanel" aria-live="polite">
+            <div>
+              <p class="eyebrow">Systemstatus</p>
+              <h2>Home Assistant Analyse</h2>
+            </div>
+            <div class="analysis-state" id="haAnalysisState">
+              <span class="analysis-spinner"></span>
+              <strong>Analyse läuft...</strong>
+            </div>
+          </section>
+
+          <section class="start-panel" id="startPanel" aria-label="Startauswahl">
+            <button class="start-card" type="button" id="manualStartBtn">
+              <span class="start-icon" data-icon="route"></span>
+              <span>
+                <strong>Gerät manuell eingeben</strong>
+                <small>Hersteller, Modell und Verbindung Schritt für Schritt auswählen.</small>
+                <em>Manuell starten</em>
+              </span>
+            </button>
+
+            <button class="start-card disabled" type="button" disabled aria-disabled="true">
+              <span class="start-icon" data-icon="qr"></span>
+              <span>
+                <strong>QR-Code einlesen</strong>
+                <small>Gerät per QR-Code oder Produktcode erkennen.</small>
+                <em>Demnächst verfügbar</em>
+              </span>
+            </button>
+          </section>
+
+          <section class="knowledge-panel" id="knowledgePanel" aria-label="Gerätesuche">
+            <div class="knowledge-head">
+              <div>
+                <p class="eyebrow">Knowledge-Datenbank</p>
+                <h2>Gerät suchen</h2>
+                <p>Suche nach Hersteller, Modellnummer oder technischer Kennung aus Zigbee2MQTT.</p>
+              </div>
+              <form class="device-search" id="deviceSearchForm">
+                <label for="deviceSearchInput">Suchbegriff</label>
+                <div>
+                  <input id="deviceSearchInput" type="search" autocomplete="off" placeholder="z. B. TS011F" />
+                  <button class="primary" type="submit">Suchen</button>
+                </div>
+              </form>
+            </div>
+            <div class="device-search-status" id="deviceSearchStatus"></div>
+            <div class="device-search-results" id="deviceSearchResults"></div>
+            <div class="device-detail-panel hidden" id="deviceDetailPanel"></div>
+          </section>
+
+          <div class="guide-panel">
+            <div class="guide-heading">
+              <span class="guide-icon" id="categoryIcon"></span>
+              <div>
+                <h2 id="questionTitle"></h2>
+                <p id="questionBody"></p>
+              </div>
+            </div>
+
+            <div class="progress-wrap" aria-label="Fortschritt">
+              <div class="progress-meta">
+                <span id="stepCounter"></span>
+                <span id="progressLabel"></span>
+              </div>
+              <div class="progress-track">
+                <div class="progress-bar" id="progressBar"></div>
+              </div>
+            </div>
+
+            <article class="wizard-card" id="questionCard"></article>
+
+            <div class="wizard-actions">
+              <button class="secondary" type="button" id="prevBtn">
+                <span class="button-icon" data-icon="arrow-left"></span>
+                Zurück
+              </button>
+              <button class="secondary" type="button" id="resetBtn">
+                <span class="button-icon" data-icon="refresh"></span>
+                Neu starten
+              </button>
+              <button class="primary" type="button" id="nextBtn">
+                Weiter
+                <span class="button-icon" data-icon="arrow-right"></span>
+              </button>
+            </div>
+          </div>
+
+          <aside class="summary-panel">
+            <p class="eyebrow">Entscheidungsprofil</p>
+            <dl class="answer-list" id="answerList"></dl>
+            <ol class="step-list" id="stepList"></ol>
+          </aside>
+        </section>
+      </main>
+    </div>
+
+    <script id="treeData" type="application/json">{{ tree | tojson }}</script>
+    <script src="{{ url_for('static', path='app.js') }}?v={{ app_version }}"></script>
+  </body>
+</html>
