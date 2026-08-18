@@ -1,5 +1,11 @@
 Smart Guide - Entwicklungsstand (18.8.2026)
 
+<img width="1527" height="1101" alt="grafik" src="https://github.com/user-attachments/assets/7ebc8f3d-c518-4ec1-a37c-3725489c82f8" />
+
+<img width="1506" height="546" alt="grafik" src="https://github.com/user-attachments/assets/a9ff93ed-cc60-4393-a095-fd837cbd26d0" />
+
+
+
 Status
 
 ✅ Home-Assistant-Verbindung (live, gegen echte Instanzen erkannt)
