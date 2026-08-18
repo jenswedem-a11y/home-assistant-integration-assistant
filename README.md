@@ -1,6 +1,5 @@
 Smart Guide - Stage of development (18.8.2026)
 
-<img width="2162" height="1297" alt="Screenshot 2026-06-24 114406" src="https://github.com/user-attachments/assets/1ee20a1e-f346-465a-99b2-7855610c735f" />
 
 
 Status
