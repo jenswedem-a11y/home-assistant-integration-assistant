@@ -2,6 +2,8 @@ Smart Guide - Stage of development (18.8.2026)
 
 <img width="1611" height="1182" alt="grafik" src="https://github.com/user-attachments/assets/15b2936a-9262-4155-a63e-8a3870308060" />
 
+<img width="1527" height="556" alt="grafik" src="https://github.com/user-attachments/assets/971f5153-c4e1-4d21-a481-9a691c2d95a4" />
+
 
 Status
 
