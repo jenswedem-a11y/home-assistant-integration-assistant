@@ -27,6 +27,8 @@ curl -fsSL https://raw.githubusercontent.com/jenswedem-a11y/home-assistant-integ
 ```
 
 Requires Docker (with the Compose plugin). No manual setup needed — the device database (4,372 devices) seeds itself automatically. After it starts, open http://localhost:8095 and connect your Home Assistant instance directly in the browser.
+📖 [Detailed installation guide](INSTALL.md)
+
 
 # Home Assistant Integration Assistant
 
