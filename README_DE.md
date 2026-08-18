@@ -16,6 +16,14 @@ Status
 📅 Nächstes Ziel:
 Breitere Protokoll-Unterstützung über Zigbee hinaus (Matter, Z-Wave)
 
+## Schnellstart
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/jenswedem-a11y/home-assistant-integration-assistant/main/install.sh | bash
+```
+
+Benötigt Docker (mit Compose-Plugin). Keine manuelle Einrichtung nötig — die Gerätedatenbank (4.372 Geräte) füllt sich automatisch. Danach http://localhost:8095 öffnen und die Home-Assistant-Verbindung direkt im Browser einrichten.
+
 ---
 
 # Home Assistant Integrationsassistent
