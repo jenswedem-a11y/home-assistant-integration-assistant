@@ -1,3 +1,4 @@
+import json
 from typing import Any
 
 from fastapi import APIRouter
@@ -13,17 +14,23 @@ def error_response(message: str) -> dict[str, Any]:
 
 def query_all(sql: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
     with get_connection() as connection:
-        with connection.cursor() as cursor:
-            cursor.execute(sql, params)
-            return [dict(row) for row in cursor.fetchall()]
+        return [dict(row) for row in connection.execute(sql, params).fetchall()]
 
 
 def query_one(sql: str, params: tuple[Any, ...] = ()) -> dict[str, Any] | None:
     with get_connection() as connection:
-        with connection.cursor() as cursor:
-            cursor.execute(sql, params)
-            row = cursor.fetchone()
-            return dict(row) if row else None
+        row = connection.execute(sql, params).fetchone()
+        return dict(row) if row else None
+
+
+def decode_json(rows: list[dict[str, Any]], column: str) -> list[dict[str, Any]]:
+    for row in rows:
+        if isinstance(row.get(column), str):
+            try:
+                row[column] = json.loads(row[column])
+            except ValueError:
+                pass
+    return rows
 
 
 def classify_match(row: dict[str, Any], query: str) -> str:
@@ -87,22 +94,22 @@ def search_devices(q: str = "") -> dict[str, Any]:
                 d.display_name,
                 d.protocol,
                 MIN(v.model_number) FILTER (
-                    WHERE v.model_number ILIKE %s
+                    WHERE v.model_number LIKE ?
                 ) AS matched_variant_model,
                 MIN(i.identifier_value) FILTER (
-                    WHERE i.identifier_value ILIKE %s
+                    WHERE i.identifier_value LIKE ?
                 ) AS matched_identifier
             FROM devices d
             LEFT JOIN device_variants v ON v.device_id = d.id
             LEFT JOIN device_identifiers i ON i.variant_id = v.id
             WHERE
-                d.canonical_vendor ILIKE %s
-                OR d.canonical_model ILIKE %s
-                OR d.display_name ILIKE %s
-                OR v.model_number ILIKE %s
-                OR i.identifier_value ILIKE %s
+                d.canonical_vendor LIKE ?
+                OR d.canonical_model LIKE ?
+                OR d.display_name LIKE ?
+                OR v.model_number LIKE ?
+                OR i.identifier_value LIKE ?
             GROUP BY d.id, d.canonical_vendor, d.canonical_model, d.display_name, d.protocol
-            ORDER BY d.canonical_vendor, d.canonical_model
+            ORDER BY d.canonical_vendor COLLATE NOCASE, d.canonical_model COLLATE NOCASE
             LIMIT 50
             """,
             (pattern, pattern, pattern, pattern, pattern, pattern, pattern),
@@ -146,8 +153,8 @@ def get_devices_by_vendor(vendor: str = "") -> dict[str, Any]:
                 protocol,
                 device_type
             FROM devices
-            WHERE canonical_vendor = %s
-            ORDER BY canonical_model
+            WHERE canonical_vendor = ?
+            ORDER BY canonical_model COLLATE NOCASE
             LIMIT 500
             """,
             (selected_vendor,),
@@ -161,12 +168,12 @@ def get_devices_by_vendor(vendor: str = "") -> dict[str, Any]:
 @router.get("/devices/{device_id}")
 def get_device(device_id: int) -> dict[str, Any]:
     try:
-        device = query_one("SELECT * FROM devices WHERE id = %s", (device_id,))
+        device = query_one("SELECT * FROM devices WHERE id = ?", (device_id,))
         if not device:
             return {"ok": False, "error": "Gerät nicht gefunden."}
 
         variants = query_all(
-            "SELECT * FROM device_variants WHERE device_id = %s ORDER BY id",
+            "SELECT * FROM device_variants WHERE device_id = ? ORDER BY id",
             (device_id,),
         )
         variant_ids = [variant["id"] for variant in variants]
@@ -174,26 +181,32 @@ def get_device(device_id: int) -> dict[str, Any]:
         identifiers: list[dict[str, Any]] = []
         if variant_ids:
             identifiers = query_all(
-                """
+                f"""
                 SELECT *
                 FROM device_identifiers
-                WHERE variant_id = ANY(%s)
+                WHERE variant_id IN ({", ".join("?" * len(variant_ids))})
                 ORDER BY identifier_type, identifier_value
                 """,
-                (variant_ids,),
+                tuple(variant_ids),
             )
 
         capabilities = query_all(
-            "SELECT * FROM device_capabilities WHERE device_id = %s ORDER BY capability",
+            "SELECT * FROM device_capabilities WHERE device_id = ? ORDER BY capability",
             (device_id,),
         )
+        decode_json(capabilities, "value")
         compatibility = query_all(
-            "SELECT * FROM device_compatibility WHERE device_id = %s ORDER BY platform",
+            "SELECT * FROM device_compatibility WHERE device_id = ? ORDER BY platform",
             (device_id,),
         )
-        sources = query_all(
-            "SELECT * FROM device_sources WHERE device_id = %s ORDER BY source, source_model",
-            (device_id,),
+        for row in compatibility:
+            row["supported"] = bool(row["supported"])
+        sources = decode_json(
+            query_all(
+                "SELECT * FROM device_sources WHERE device_id = ? ORDER BY source, source_model",
+                (device_id,),
+            ),
+            "raw_data",
         )
     except DatabaseConfigError as exc:
         return error_response(str(exc))
@@ -214,10 +227,10 @@ def get_vendors() -> dict[str, Any]:
     try:
         items = query_all(
             """
-            SELECT canonical_vendor AS vendor, COUNT(*)::integer AS device_count
+            SELECT canonical_vendor AS vendor, COUNT(*) AS device_count
             FROM devices
             GROUP BY canonical_vendor
-            ORDER BY device_count DESC, canonical_vendor
+            ORDER BY device_count DESC, canonical_vendor COLLATE NOCASE
             """
         )
     except DatabaseConfigError as exc:

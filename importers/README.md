@@ -2,7 +2,7 @@
 
 Dieser Ordner enthaelt manuelle Importer fuer die SmartGuide Knowledge-Datenbank.
 
-Fuer SmartGuide v0.1 ist ein manueller Zigbee2MQTT-Importer vorbereitet. Er kann entweder eine lokale JSON-Datei oder ein lokal vorhandenes `zigbee-herdsman-converters` Repository lesen und schreibt die Daten in PostgreSQL. Es gibt keinen Live-Download aus GitHub, keinen Scheduler, keine n8n-Integration und keine KI-Integration.
+Fuer SmartGuide v0.1 ist ein manueller Zigbee2MQTT-Importer vorbereitet. Er kann entweder eine lokale JSON-Datei oder ein lokal vorhandenes `zigbee-herdsman-converters` Repository lesen und schreibt die Daten in die SQLite-Katalogdatei `catalog/smartguide.db`. Es gibt keinen Live-Download aus GitHub, keinen Scheduler, keine n8n-Integration und keine KI-Integration.
 
 ## Zigbee2MQTT-Importer
 
@@ -12,10 +12,10 @@ Standarddatei:
 data/import/zigbee2mqtt_devices.sample.json
 ```
 
-Datenbankverbindung setzen:
+Zieldatei ist standardmaessig `catalog/smartguide.db` (wird bei Bedarf angelegt, andere Datei mit `--db`). Vorher den aktuellen Katalog bauen:
 
 ```bash
-export SMARTGUIDE_DATABASE_URL="postgresql://smartguide:<passwort>@localhost:5433/smartguide"
+python3 tools/catalog.py build
 ```
 
 Sample-Import ausfuehren:
@@ -29,8 +29,6 @@ Eigene lokale Datei importieren:
 ```bash
 python3 importers/zigbee2mqtt_importer.py --source sample data/import/meine_zigbee2mqtt_devices.json
 ```
-
-Wenn `SMARTGUIDE_DATABASE_URL` fehlt, beendet sich der Importer mit einer verstaendlichen Fehlermeldung.
 
 Der Import ist idempotent ausgelegt. Bereits bekannte Geraete, Varianten, Kennungen, Quellen, Faehigkeiten und Kompatibilitaetseintraege werden aktualisiert statt doppelt angelegt.
 
@@ -58,10 +56,14 @@ Der Python-Importer ruft intern `importers/zhc_export_devices.mjs` auf. Dieses N
 
 ## Lokale Abhaengigkeiten
 
-Der Importer nutzt das Python-Paket `psycopg`. Falls es lokal noch nicht installiert ist:
+Der Importer braucht nur die Python-Standardbibliothek (`sqlite3`). Fuer `--source zhc` wird zusaetzlich Node.js benoetigt, weil `zigbee-herdsman-converters` ein JavaScript/TypeScript-Projekt ist.
+
+## Katalog ins Repository uebernehmen
+
+Versioniert wird nicht die `.db`-Datei, sondern der komprimierte SQL-Seed. Nach einem Import:
 
 ```bash
-python3 -m pip install "psycopg[binary]"
+python3 tools/catalog.py dump   # catalog/smartguide.db -> database/seed-devices.sql.gz
 ```
 
-Fuer `--source zhc` wird zusaetzlich Node.js benoetigt, weil `zigbee-herdsman-converters` ein JavaScript/TypeScript-Projekt ist.
+Beim naechsten `docker compose up -d --build` wird der Katalog aus dem Seed ins Image gebaut.

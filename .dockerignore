@@ -1,0 +1,7 @@
+.git
+.env
+.env.*
+data
+catalog
+db-init
+**/__pycache__

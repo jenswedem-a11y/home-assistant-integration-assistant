@@ -31,8 +31,9 @@ fi
 cd "$INSTALL_DIR"
 
 echo
-echo "Starte SmartGuide (Erststart laedt automatisch eine Datenbank mit ueber 4.000 bekannten Geraeten)..."
-docker compose up -d --build
+echo "Starte SmartGuide (die Datenbank mit ueber 4.000 bekannten Geraeten ist im Image enthalten)..."
+# --remove-orphans: entfernt den Postgres-Container aelterer Versionen
+docker compose up -d --build --remove-orphans
 
 echo
 echo "Fertig!"

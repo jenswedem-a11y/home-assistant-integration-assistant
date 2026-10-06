@@ -12,7 +12,7 @@
 curl -fsSL https://raw.githubusercontent.com/jenswedem-a11y/home-assistant-integration-assistant/main/install.sh | bash
 ```
 
-Lädt das Repository nach `~/smartguide`, baut die App und startet beide Container (App und Postgres-Datenbank). Die Gerätedatenbank (4.372 Geräte) wird beim ersten Start automatisch geladen — kein manueller Import nötig.
+Lädt das Repository nach `~/smartguide`, baut die App und startet sie in einem einzigen Container. Die Gerätedatenbank (4.372 Geräte) ist im Image enthalten — kein manueller Import nötig.
 
 Danach **http://localhost:8095** öffnen.
 
@@ -51,7 +51,6 @@ Alle optional — SmartGuide läuft auch ganz ohne diese mit sinnvollen Standard
 | Variable | Standard | Zweck |
 |---|---|---|
 | `SMARTGUIDE_PORT` | `8095` | Host-Port für die Weboberfläche |
-| `SMARTGUIDE_POSTGRES_PASSWORD` | `smartguide` | Postgres-Passwort (nur relevant, wenn der DB-Port über localhost hinaus freigegeben wird) |
 | `HOME_ASSISTANT_URL` / `HOME_ASSISTANT_TOKEN` | *(nicht gesetzt)* | Home-Assistant-Verbindung vorab setzen statt über das Formular |
 
 ## Aktualisieren
@@ -60,7 +59,7 @@ Alle optional — SmartGuide läuft auch ganz ohne diese mit sinnvollen Standard
 curl -fsSL https://raw.githubusercontent.com/jenswedem-a11y/home-assistant-integration-assistant/main/install.sh | bash
 ```
 
-Erneutes Ausführen des Install-Skripts holt den aktuellen Code und baut neu. Gerätedatenbank und gespeicherte Home-Assistant-Verbindung bleiben unberührt — beides liegt im `data/`-Verzeichnis, das das Skript nie anfasst.
+Erneutes Ausführen des Install-Skripts holt den aktuellen Code und baut neu. Die gespeicherte Home-Assistant-Verbindung bleibt unberührt — sie liegt im `data/`-Verzeichnis, das das Skript nie anfasst. Die Gerätedatenbank kommt mit dem Image, Updates bringen also automatisch neue Geräte mit. Beim Update von einer Version mit separatem Postgres-Container wird dieser entfernt; die alten Daten in `data/postgres` werden nicht mehr gebraucht und können gelöscht werden.
 
 ## Deinstallieren
 
@@ -71,7 +70,7 @@ cd ..
 rm -rf smartguide
 ```
 
-`down -v` entfernt auch das Postgres-Datenvolume. `-v` weglassen, um die Gerätedatenbank für eine spätere Neuinstallation zu behalten.
+Das Löschen des Verzeichnisses entfernt auch die gespeicherte Home-Assistant-Verbindung (`data/ha_config.json`).
 
 ## Problembehandlung
 
@@ -85,6 +84,3 @@ Docker installieren: [docs.docker.com/get-docker](https://docs.docker.com/get-do
 * Die URL muss *vom Rechner mit SmartGuide aus* erreichbar sein, nicht nur vom eigenen Browser — im Zweifel von dort aus `curl` testen.
 * Long-Lived-Access-Tokens werden in Home Assistant nur einmal bei der Erstellung angezeigt. Verloren? Einfach einen neuen erstellen.
 * Laufen Home Assistant und SmartGuide auf demselben Host in Docker, aber in unterschiedlichen Compose-Projekten, erreicht `localhost`/`127.0.0.1` im SmartGuide-Container Home Assistant nicht — stattdessen die LAN-IP des Hosts oder einen Docker-Netzwerk-Alias verwenden.
-
-**Gerätedatenbank scheint nach der Installation leer**
-Passiert nur, wenn `data/postgres` schon von einer vorherigen, unvollständigen Installation existierte (Postgres führt den Seed-Schritt nur bei einem *frischen* Datenverzeichnis aus). `data/postgres` löschen und neu installieren erzwingt einen sauberen Seed.

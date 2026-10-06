@@ -3,3 +3,5 @@ data/postgres/
 .env
 .env.*
 !.env.example
+catalog/
+__pycache__/

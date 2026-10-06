@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -19,6 +19,9 @@ from typing import Any
 SOURCE = "zigbee2mqtt"
 DEFAULT_INPUT = "data/import/zigbee2mqtt_devices.sample.json"
 ZHC_EXPORTER = Path(__file__).with_name("zhc_export_devices.mjs")
+REPO_ROOT = Path(__file__).resolve().parent.parent
+DEFAULT_DATABASE = REPO_ROOT / "catalog" / "smartguide.db"
+SCHEMA_FILE = REPO_ROOT / "database" / "schema.sql"
 
 
 def sanitize_value(value: Any) -> Any:
@@ -87,27 +90,11 @@ def load_zhc_devices(zhc_path: Path) -> list[dict[str, Any]]:
         output_path.unlink(missing_ok=True)
 
 
-def require_database_url() -> str:
-    database_url = os.getenv("SMARTGUIDE_DATABASE_URL")
-    if not database_url:
-        raise SystemExit(
-            "SMARTGUIDE_DATABASE_URL fehlt. Beispiel: "
-            "export SMARTGUIDE_DATABASE_URL='postgresql://smartguide:<passwort>@localhost:5433/smartguide'"
-        )
-    return database_url
-
-
-def import_psycopg() -> Any:
-    try:
-        import psycopg
-        from psycopg.types.json import Json
-    except ImportError as exc:
-        raise SystemExit(
-            "Python-Paket 'psycopg' fehlt. Installiere es fuer den manuellen Import, "
-            "z.B. mit: python3 -m pip install 'psycopg[binary]'"
-        ) from exc
-
-    return psycopg, Json
+def open_database(path: Path) -> sqlite3.Connection:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    connection = sqlite3.connect(path)
+    connection.executescript(SCHEMA_FILE.read_text(encoding="utf-8"))
+    return connection
 
 
 def as_list(value: Any) -> list[Any]:
@@ -180,15 +167,15 @@ def upsert_device(cursor: Any, device: dict[str, Any]) -> int:
             confidence,
             updated_at
         )
-        VALUES (%s, %s, %s, 'zigbee', %s, %s, %s, now())
+        VALUES (?, ?, ?, 'zigbee', ?, ?, ?, CURRENT_TIMESTAMP)
         ON CONFLICT (canonical_vendor, canonical_model)
         DO UPDATE SET
             display_name = EXCLUDED.display_name,
             protocol = EXCLUDED.protocol,
             device_type = EXCLUDED.device_type,
             description = EXCLUDED.description,
-            confidence = GREATEST(devices.confidence, EXCLUDED.confidence),
-            updated_at = now()
+            confidence = MAX(devices.confidence, EXCLUDED.confidence),
+            updated_at = CURRENT_TIMESTAMP
         RETURNING id
         """,
         (vendor, model, display_name, device_type, description, 0.9000),
@@ -213,15 +200,15 @@ def upsert_variant(cursor: Any, device_id: int, device: dict[str, Any]) -> int:
             confidence,
             updated_at
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, now())
-        ON CONFLICT (device_id, variant_name, model_number)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT (device_id, COALESCE(variant_name, ''), COALESCE(model_number, ''))
         DO UPDATE SET
             hardware_version = COALESCE(EXCLUDED.hardware_version, device_variants.hardware_version),
             firmware_version = COALESCE(EXCLUDED.firmware_version, device_variants.firmware_version),
             region = COALESCE(EXCLUDED.region, device_variants.region),
             notes = COALESCE(EXCLUDED.notes, device_variants.notes),
-            confidence = GREATEST(device_variants.confidence, EXCLUDED.confidence),
-            updated_at = now()
+            confidence = MAX(device_variants.confidence, EXCLUDED.confidence),
+            updated_at = CURRENT_TIMESTAMP
         RETURNING id
         """,
         (
@@ -257,9 +244,9 @@ def upsert_identifier(
             source,
             confidence
         )
-        VALUES (%s, %s, %s, %s, %s)
+        VALUES (?, ?, ?, ?, ?)
         ON CONFLICT (variant_id, identifier_type, identifier_value, source)
-        DO UPDATE SET confidence = GREATEST(device_identifiers.confidence, EXCLUDED.confidence)
+        DO UPDATE SET confidence = MAX(device_identifiers.confidence, EXCLUDED.confidence)
         """,
         (variant_id, identifier_type, identifier_value, SOURCE, confidence),
     )
@@ -293,7 +280,7 @@ def import_identifiers(cursor: Any, variant_id: int, device: dict[str, Any]) -> 
         upsert_identifier(cursor, variant_id, "white_label", label, 0.7000)
 
 
-def upsert_source(cursor: Any, Json: Any, device_id: int, device: dict[str, Any]) -> None:
+def upsert_source(cursor: Any, device_id: int, device: dict[str, Any]) -> None:
     vendor = text_or_none(device.get("vendor"))
     model = text_or_none(device.get("model")) or text_or_none(device.get("model_number"))
 
@@ -308,15 +295,15 @@ def upsert_source(cursor: Any, Json: Any, device_id: int, device: dict[str, Any]
             raw_data,
             last_seen_at
         )
-        VALUES (%s, %s, %s, %s, %s, %s, now())
-        ON CONFLICT (device_id, source, source_model)
+        VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT (device_id, source, COALESCE(source_model, ''))
         DO UPDATE SET
             source_vendor = EXCLUDED.source_vendor,
             source_url = EXCLUDED.source_url,
             raw_data = EXCLUDED.raw_data,
-            last_seen_at = now()
+            last_seen_at = CURRENT_TIMESTAMP
         """,
-        (device_id, SOURCE, vendor, model, source_url_for(device, model or ""), Json(device)),
+        (device_id, SOURCE, vendor, model, source_url_for(device, model or ""), json.dumps(device, ensure_ascii=False)),
     )
 
 
@@ -328,7 +315,7 @@ def capability_name(expose: Any, index: int) -> str:
     return f"expose:{index}"
 
 
-def upsert_capabilities(cursor: Any, Json: Any, device_id: int, device: dict[str, Any]) -> None:
+def upsert_capabilities(cursor: Any, device_id: int, device: dict[str, Any]) -> None:
     exposes = as_list(device.get("exposes"))
     if not exposes:
         return
@@ -337,11 +324,11 @@ def upsert_capabilities(cursor: Any, Json: Any, device_id: int, device: dict[str
         cursor.execute(
             """
             INSERT INTO device_capabilities (device_id, capability, value, source)
-            VALUES (%s, %s, %s, %s)
-            ON CONFLICT (device_id, capability, source)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT (device_id, capability, COALESCE(source, ''))
             DO UPDATE SET value = EXCLUDED.value
             """,
-            (device_id, capability_name(expose, index), Json(expose), SOURCE),
+            (device_id, capability_name(expose, index), json.dumps(expose, ensure_ascii=False), SOURCE),
         )
 
 
@@ -351,8 +338,8 @@ def upsert_compatibility(cursor: Any, device_id: int, device: dict[str, Any]) ->
     cursor.execute(
         """
         INSERT INTO device_compatibility (device_id, platform, supported, notes, source)
-        VALUES (%s, 'zigbee2mqtt', true, %s, %s)
-        ON CONFLICT (device_id, platform, source)
+        VALUES (?, 'zigbee2mqtt', 1, ?, ?)
+        ON CONFLICT (device_id, platform, COALESCE(source, ''))
         DO UPDATE SET
             supported = EXCLUDED.supported,
             notes = EXCLUDED.notes
@@ -365,7 +352,7 @@ def create_import_run(cursor: Any, items_seen: int) -> int:
     cursor.execute(
         """
         INSERT INTO import_runs (source, status, items_seen)
-        VALUES (%s, 'running', %s)
+        VALUES (?, 'running', ?)
         RETURNING id
         """,
         (SOURCE, items_seen),
@@ -383,11 +370,11 @@ def finish_import_run(
     cursor.execute(
         """
         UPDATE import_runs
-        SET status = %s,
-            finished_at = now(),
-            items_imported = %s,
-            error_message = %s
-        WHERE id = %s
+        SET status = ?,
+            finished_at = CURRENT_TIMESTAMP,
+            items_imported = ?,
+            error_message = ?
+        WHERE id = ?
         """,
         (status, items_imported, error_message, run_id),
     )
@@ -409,34 +396,30 @@ def get_import_devices(args: argparse.Namespace) -> list[dict[str, Any]]:
 
 
 def run_import(args: argparse.Namespace) -> int:
-    database_url = require_database_url()
     devices = get_import_devices(args)
-    psycopg, Json = import_psycopg()
 
     imported = 0
-    connection = psycopg.connect(database_url)
+    connection = open_database(Path(args.db))
     try:
-        with connection.cursor() as cursor:
-            run_id = create_import_run(cursor, len(devices))
+        cursor = connection.cursor()
+        run_id = create_import_run(cursor, len(devices))
         connection.commit()
 
         try:
-            with connection.cursor() as cursor:
-                for device in devices:
-                    device_id = upsert_device(cursor, device)
-                    variant_id = upsert_variant(cursor, device_id, device)
-                    import_identifiers(cursor, variant_id, device)
-                    upsert_source(cursor, Json, device_id, device)
-                    upsert_capabilities(cursor, Json, device_id, device)
-                    upsert_compatibility(cursor, device_id, device)
-                    imported += 1
+            for device in devices:
+                device_id = upsert_device(cursor, device)
+                variant_id = upsert_variant(cursor, device_id, device)
+                import_identifiers(cursor, variant_id, device)
+                upsert_source(cursor, device_id, device)
+                upsert_capabilities(cursor, device_id, device)
+                upsert_compatibility(cursor, device_id, device)
+                imported += 1
 
-                finish_import_run(cursor, run_id, "success", imported)
+            finish_import_run(cursor, run_id, "success", imported)
             connection.commit()
         except Exception as exc:
             connection.rollback()
-            with connection.cursor() as cursor:
-                finish_import_run(cursor, run_id, "failed", imported, str(exc))
+            finish_import_run(connection.cursor(), run_id, "failed", imported, str(exc))
             connection.commit()
             raise
     finally:
@@ -457,6 +440,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--zhc-path",
         help="Pfad zu einem lokal geklonten und gebauten zigbee-herdsman-converters Repository.",
+    )
+    parser.add_argument(
+        "--db",
+        default=str(DEFAULT_DATABASE),
+        help=f"SQLite-Katalogdatei, wird bei Bedarf angelegt (Standard: {DEFAULT_DATABASE})",
     )
     parser.add_argument(
         "input",
