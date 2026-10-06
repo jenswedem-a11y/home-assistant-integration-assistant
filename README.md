@@ -1,37 +1,57 @@
-Smart Guide - Update (18.8.2026)
+# SmartGuide
 
-<img width="1527" height="1101" alt="grafik" src="https://github.com/user-attachments/assets/526a6a0e-c355-4875-8d06-2090eb769698" />
+**Update (October 6, 2026): SmartGuide is now a Home Assistant add-on, and the interface is in English.**
 
+SmartGuide is a guided assistant for adding smart home devices to Home Assistant. Pick a device (or search a catalog of 4,372 Zigbee devices by model number or Zigbee identifier), and SmartGuide checks your *actual* Home Assistant setup for what that device needs — Zigbee (ZHA or Zigbee2MQTT), MQTT, Matter, Thread, Bluetooth or a manufacturer bridge — tells you what's missing, and can start Zigbee pairing for you.
 
-<img width="1527" height="556" alt="grafik" src="https://github.com/user-attachments/assets/971f5153-c4e1-4d21-a481-9a691c2d95a4" />
+<img width="1527" height="1101" alt="SmartGuide start screen" src="https://github.com/user-attachments/assets/526a6a0e-c355-4875-8d06-2090eb769698" />
 
+<img width="1527" height="556" alt="SmartGuide wizard" src="https://github.com/user-attachments/assets/971f5153-c4e1-4d21-a481-9a691c2d95a4" />
 
-Status
+<sub>Screenshots show the previous (German) version; the layout is the same.</sub>
 
-✅ Home Assistant Verbindung (live, gegen echte Instanzen erkannt)
-✅ Token speichern
-✅ Geräteanalyse
-✅ Entscheidungsbaum
-✅ Gerätedatenbank (4.372 echte Geräte importiert)
-✅ Zigbee-Erkennung (inkl. Pairing-Aktivierung mit Erfolgsverifikation)
-✅ MQTT-Erkennung
+## Install as a Home Assistant add-on (recommended)
 
-🚧 Matter- / Z-Wave-Unterstützung
-🚧 Aufräumen der alten statischen Geräteliste (Fallback-Altlast)
+For Home Assistant OS and Supervised installations.
 
-📅 Nächstes Ziel:
-Breitere Protokoll-Unterstützung über Zigbee hinaus (Matter, Z-Wave)
+[![Add the SmartGuide add-on repository to your Home Assistant](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fjenswedem-a11y%2Fhome-assistant-integration-assistant)
 
+1. Click the button above and confirm adding the repository. *(If it opens `homeassistant.local:8123` and that's not your address, change your instance URL once on [my.home-assistant.io](https://my.home-assistant.io/) via the pencil icon.)*
+   Or manually: **Settings → Add-ons → Add-on Store → ⋮ → Repositories** and add `https://github.com/jenswedem-a11y/home-assistant-integration-assistant`
+2. Find **SmartGuide** in the store, click **Install**, then **Start**.
+3. Turn on **Show in sidebar** on the add-on's Info tab and open SmartGuide from the sidebar.
 
-## Quick Start
+No configuration needed: the add-on connects to Home Assistant automatically (no URL, no access token). Supported: amd64 and aarch64 (e.g. Raspberry Pi 4/5). More in the [add-on documentation](smartguide/DOCS.md).
+
+## Install with Docker
+
+For Home Assistant Container/Core setups, or to run SmartGuide on another machine:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/jenswedem-a11y/home-assistant-integration-assistant/main/install.sh | bash
 ```
 
-Requires Docker (with the Compose plugin). No manual setup needed — the device database (4,372 devices) seeds itself automatically. After it starts, open http://localhost:8095 and connect your Home Assistant instance directly in the browser.
+Requires Docker with the Compose plugin. The device catalog is built into the image, no database setup needed. Open http://localhost:8095 and connect your Home Assistant instance (URL + long-lived access token) in the browser.
 📖 [Detailed installation guide](INSTALL.md)
 
+## Status
+
+✅ Home Assistant add-on (Ingress, automatic connection)
+✅ English and German interface
+✅ Live analysis of your Home Assistant setup
+✅ Decision tree with requirements check
+✅ Device catalog (4,372 real Zigbee devices)
+✅ Zigbee detection, incl. starting pairing mode with verification
+✅ MQTT detection
+
+🚧 Matter / Z-Wave support
+🚧 QR code scanning
+
+📅 Next goal: broader protocol support beyond Zigbee (Matter, Z-Wave)
+
+Feedback, bugs and device data corrections are welcome as [GitHub issues](https://github.com/jenswedem-a11y/home-assistant-integration-assistant/issues).
+
+---
 
 # Home Assistant Integration Assistant
 

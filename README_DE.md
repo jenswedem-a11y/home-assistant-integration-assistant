@@ -1,36 +1,53 @@
-Smart Guide - Entwicklungsstand (18.8.2026)
+# SmartGuide
 
-<img width="1527" height="1101" alt="grafik" src="https://github.com/user-attachments/assets/7ebc8f3d-c518-4ec1-a37c-3725489c82f8" />
+**Update (6. Oktober 2026): SmartGuide gibt es jetzt als Home-Assistant-Add-on, und die Oberfläche ist auch auf Englisch verfügbar.**
 
-<img width="1506" height="546" alt="grafik" src="https://github.com/user-attachments/assets/a9ff93ed-cc60-4393-a095-fd837cbd26d0" />
+SmartGuide ist ein geführter Assistent, um Smarthome-Geräte in Home Assistant einzubinden. Gerät auswählen (oder im Katalog mit 4.372 Zigbee-Geräten nach Modellnummer oder Zigbee-Kennung suchen), und SmartGuide prüft deine *tatsächliche* Home-Assistant-Installation auf das, was das Gerät braucht — Zigbee (ZHA oder Zigbee2MQTT), MQTT, Matter, Thread, Bluetooth oder eine Hersteller-Bridge —, sagt dir, was fehlt, und kann den Zigbee-Kopplungsmodus für dich starten.
 
+<img width="1527" height="1101" alt="SmartGuide Startbildschirm" src="https://github.com/user-attachments/assets/7ebc8f3d-c518-4ec1-a37c-3725489c82f8" />
 
+<img width="1506" height="546" alt="SmartGuide Assistent" src="https://github.com/user-attachments/assets/a9ff93ed-cc60-4393-a095-fd837cbd26d0" />
 
-Status
+## Installation als Home-Assistant-Add-on (empfohlen)
 
-✅ Home-Assistant-Verbindung (live, gegen echte Instanzen erkannt)
-✅ Token speichern
-✅ Geräteanalyse
-✅ Entscheidungsbaum
-✅ Gerätedatenbank (4.372 echte Geräte importiert)
-✅ Zigbee-Erkennung (inkl. Kopplungsmodus-Aktivierung mit Erfolgsverifikation)
-✅ MQTT-Erkennung
+Für Home Assistant OS und Supervised-Installationen.
 
-🚧 Matter- / Z-Wave-Unterstützung
-🚧 Aufräumen der alten statischen Geräteliste (Fallback-Altlast)
+[![SmartGuide-Add-on-Repository zu Home Assistant hinzufügen](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fjenswedem-a11y%2Fhome-assistant-integration-assistant)
 
-📅 Nächstes Ziel:
-Breitere Protokoll-Unterstützung über Zigbee hinaus (Matter, Z-Wave)
+1. Auf den Button klicken und das Hinzufügen des Repositorys bestätigen. *(Öffnet sich `homeassistant.local:8123` und das ist nicht deine Adresse: einmalig auf [my.home-assistant.io](https://my.home-assistant.io/) über das Stift-Symbol die Adresse deiner Instanz eintragen.)*
+   Oder manuell: **Einstellungen → Add-ons → Add-on Store → ⋮ → Repositories** und `https://github.com/jenswedem-a11y/home-assistant-integration-assistant` hinzufügen
+2. **SmartGuide** im Store auswählen, **Installieren**, dann **Starten**.
+3. Im Reiter Info des Add-ons **In Seitenleiste anzeigen** einschalten und SmartGuide über die Seitenleiste öffnen.
 
-## Schnellstart
+Keine Konfiguration nötig: Das Add-on verbindet sich automatisch mit Home Assistant (keine URL, kein Zugriffstoken). Unterstützt: amd64 und aarch64 (z. B. Raspberry Pi 4/5). Mehr in der [Add-on-Dokumentation](smartguide/DOCS.md) (Englisch).
+
+## Installation mit Docker
+
+Für Home Assistant Container/Core oder um SmartGuide auf einem anderen Rechner zu betreiben:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/jenswedem-a11y/home-assistant-integration-assistant/main/install.sh | bash
 ```
 
-Benötigt Docker (mit Compose-Plugin). Keine manuelle Einrichtung nötig — die Gerätedatenbank (4.372 Geräte) füllt sich automatisch. Danach http://localhost:8095 öffnen und die Home-Assistant-Verbindung direkt im Browser einrichten.
+Benötigt Docker mit Compose-Plugin. Die Gerätedatenbank ist im Image enthalten, keine Datenbank-Einrichtung nötig. Danach http://localhost:8095 öffnen und die Home-Assistant-Verbindung (URL + Long-Lived Access Token) im Browser einrichten.
 📖 [Ausführliche Installationsanleitung](INSTALL_DE.md)
 
+## Status
+
+✅ Home-Assistant-Add-on (Ingress, automatische Verbindung)
+✅ Oberfläche auf Deutsch und Englisch
+✅ Live-Analyse der Home-Assistant-Installation
+✅ Entscheidungsbaum mit Voraussetzungsprüfung
+✅ Gerätedatenbank (4.372 echte Zigbee-Geräte)
+✅ Zigbee-Erkennung (inkl. Kopplungsmodus-Aktivierung mit Erfolgsverifikation)
+✅ MQTT-Erkennung
+
+🚧 Matter- / Z-Wave-Unterstützung
+🚧 QR-Code-Erkennung
+
+📅 Nächstes Ziel: Breitere Protokoll-Unterstützung über Zigbee hinaus (Matter, Z-Wave)
+
+Feedback, Fehler und Korrekturen an Gerätedaten gerne als [GitHub-Issue](https://github.com/jenswedem-a11y/home-assistant-integration-assistant/issues).
 
 ---
 
