@@ -9,7 +9,7 @@ SmartGuide walks you through adding a new smart home device to Home Assistant:
 
 ## Usage
 
-After installing and starting the add-on, open **SmartGuide** from the sidebar. There is nothing to configure: the add-on talks to Home Assistant through the Supervisor, so no URL or access token is needed.
+After installing, start the add-on and turn on **Show in sidebar** on its Info tab (Home Assistant leaves this off by default), then open **SmartGuide** from the sidebar. You can also use **Open web UI** on the Info tab. There is nothing to configure: the add-on talks to Home Assistant through the Supervisor, so no URL or access token is needed.
 
 The interface is available in English and German and follows your browser language. Use the EN/DE switch in the top right to change it.
 
