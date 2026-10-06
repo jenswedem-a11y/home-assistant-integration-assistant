@@ -14,7 +14,7 @@ class DatabaseConfigError(RuntimeError):
 def get_database_path() -> Path:
     database_path = Path(os.getenv("SMARTGUIDE_DATABASE_PATH") or DEFAULT_DATABASE_PATH)
     if not database_path.is_file():
-        raise DatabaseConfigError(f"Gerätedatenbank nicht gefunden: {database_path}")
+        raise DatabaseConfigError(str(database_path))
     return database_path
 
 

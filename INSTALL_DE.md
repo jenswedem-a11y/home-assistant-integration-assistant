@@ -44,6 +44,10 @@ SmartGuide startet zunächst ohne Home-Assistant-Verbindung — das ist normal, 
 
 SmartGuide testet die Verbindung vor dem Speichern und legt sie in `data/ha_config.json` auf dem Host ab (nicht im Repository) — übersteht also Container-Neustarts und Rebuilds.
 
+## Sprache
+
+Die Oberfläche gibt es auf Englisch und Deutsch. SmartGuide richtet sich nach der Browsersprache (Englisch für alles außer Deutsch); oben rechts lässt sich mit EN/DE umschalten.
+
 ## Konfigurationsoptionen
 
 Alle optional — SmartGuide läuft auch ganz ohne diese mit sinnvollen Standardwerten. Für eigene Werte eine `.env`-Datei neben `docker-compose.yml` anlegen:

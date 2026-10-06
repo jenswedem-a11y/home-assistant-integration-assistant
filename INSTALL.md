@@ -44,6 +44,10 @@ SmartGuide starts up without any Home Assistant connection configured — this i
 
 SmartGuide tests the connection before saving it and stores it in `data/ha_config.json` on the host (not in the repository), so it survives container restarts and rebuilds.
 
+## Language
+
+The interface is available in English and German. SmartGuide follows your browser language (English for anything other than German); use the EN/DE switch in the top right to change it.
+
 ## Configuration Reference
 
 All optional — SmartGuide runs with sensible defaults if you set none of these. Create a `.env` file next to `docker-compose.yml` to override:

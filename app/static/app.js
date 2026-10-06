@@ -1,4 +1,14 @@
 const tree = JSON.parse(document.getElementById("treeData").textContent);
+const i18n = JSON.parse(document.getElementById("i18nData").textContent);
+
+function t(key, params = {}) {
+  const text = i18n.strings[key] ?? key;
+  return text.replace(/\{(\w+)\}/g, (match, name) => (name in params ? params[name] : match));
+}
+
+function tn(key, count, params = {}) {
+  return t(`${key}.${count === 1 ? "one" : "other"}`, { count, ...params });
+}
 
 const icons = {
   lightbulb:
@@ -31,38 +41,11 @@ const icons = {
     '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>',
 };
 
-const steps = [
-  {
-    id: "category",
-    title: "Was möchtest du einrichten?",
-    body: "Wähle zuerst die Geräteart. Erst danach fragt Smart Guide nach Hersteller, Modell, Verbindung und Voraussetzungen.",
-  },
-  {
-    id: "manufacturer",
-    title: "Welcher Hersteller?",
-    body: "Der Hersteller entscheidet oft, ob eine lokale Integration, eine Bridge oder eine Cloud-Anbindung nötig ist.",
-  },
-  {
-    id: "model",
-    title: "Welches Modell?",
-    body: "Das Modell grenzt den passenden Integrationsweg ein. Wenn du es nicht genau kennst, wähle die nächstbeste Option.",
-  },
-  {
-    id: "connection",
-    title: "Welche Verbindung wird verwendet?",
-    body: "Die Funk- oder Netzwerkart bestimmt, welche Infrastruktur vor konkreten Einrichtungsschritten vorhanden sein muss.",
-  },
-  {
-    id: "infrastructure",
-    title: "Automatische Prüfung der Voraussetzungen",
-    body: "Smart Guide prüft zuerst, was aus Home Assistant ermittelt werden kann. Nur unklare Punkte werden noch abgefragt.",
-  },
-  {
-    id: "result",
-    title: "Bewertung und Integrationsweg",
-    body: "Smart Guide zeigt, ob der Pfad möglich ist, welche Voraussetzungen fehlen und was als Nächstes zu tun ist.",
-  },
-];
+const steps = ["category", "manufacturer", "model", "connection", "infrastructure", "result"].map((id) => ({
+  id,
+  title: t(`step.${id}.title`),
+  body: t(`step.${id}.body`),
+}));
 
 const state = {
   category: tree.categories[0].id,
@@ -152,24 +135,24 @@ function renderHaAnalysis(result) {
       <div class="connection-status">
         <span>${icons.check}</span>
         <div>
-          <strong>Home Assistant verbunden</strong>
-          <small>Letzte Analyse: ${formatAnalysisTime(analysis.scanned_at)}</small>
+          <strong>${t("analysis.connected")}</strong>
+          <small>${t("analysis.last_scan", { time: formatAnalysisTime(analysis.scanned_at) })}</small>
         </div>
-        <button class="secondary" type="button" id="changeConnectionBtn">Verbindung ändern</button>
+        <button class="secondary" type="button" id="changeConnectionBtn">${t("analysis.change_connection")}</button>
       </div>
-      <h3 class="recognition-title">Was Smart Guide erkannt hat</h3>
+      <h3 class="recognition-title">${t("analysis.recognized_title")}</h3>
       <div class="simple-insights">
         ${renderCapabilitySection(translated.capabilities || [])}
         ${renderRealDeviceSection(translated.real_devices || {}, translated.integrations || {})}
         ${renderFoundationSection(translated.integrations || {})}
       </div>
       <div class="next-suggestion">
-        <h3>Nächster sinnvoller Schritt</h3>
+        <h3>${t("analysis.next_step_title")}</h3>
         <p>${buildTranslatedNextStep(translated)}</p>
-        ${analysis.home_assistant_url ? `<a class="ha-link" href="${analysis.home_assistant_url}" target="_blank" rel="noreferrer">In Home Assistant öffnen</a>` : ""}
+        ${analysis.home_assistant_url ? `<a class="ha-link" href="${analysis.home_assistant_url}" target="_blank" rel="noreferrer">${t("common.open_in_ha")}</a>` : ""}
       </div>
       <details class="advanced-details">
-        <summary>Technische Details anzeigen</summary>
+        <summary>${t("common.show_technical_details")}</summary>
         <div class="technical-summary">
           ${renderTechnicalEntities(translated)}
           ${renderLegacyGroups(analysis, analysis.home_assistant_url)}
@@ -182,10 +165,10 @@ function renderHaAnalysis(result) {
 }
 
 function renderCapabilitySection(capabilities) {
-  const items = capabilities.length ? capabilities : ["Noch keine nutzbaren Fähigkeiten erkannt"];
+  const items = capabilities.length ? capabilities.map((key) => t(`capability.${key}`)) : [t("analysis.no_capabilities")];
   return `
     <section class="insight-section">
-      <h4>Bereits nutzbare Fähigkeiten</h4>
+      <h4>${t("analysis.capabilities_title")}</h4>
       ${items.map((item) => renderInsightLine(item, capabilities.length ? "ok" : "unknown")).join("")}
     </section>
   `;
@@ -193,14 +176,14 @@ function renderCapabilitySection(capabilities) {
 
 function renderRealDeviceSection(realDevices, integrations) {
   const rows = [
-    [`${realDevices.lights?.length || 0} Lichtgeräte`, realDevices.lights?.length > 0],
-    [`${realDevices.tvs?.length || 0} Fernseher / Mediengeräte${integrations.android_tv ? " · Android TV erkannt" : ""}`, realDevices.tvs?.length > 0],
-    [`${realDevices.echo_devices?.length || 0} Echo-Geräte`, realDevices.echo_devices?.length > 0],
-    [`${realDevices.mobile_devices?.length || 0} Smartphone`, realDevices.mobile_devices?.length > 0],
+    [tn("analysis.lights", realDevices.lights?.length || 0), realDevices.lights?.length > 0],
+    [`${tn("analysis.tvs", realDevices.tvs?.length || 0)}${integrations.android_tv ? ` · ${t("analysis.android_tv_detected")}` : ""}`, realDevices.tvs?.length > 0],
+    [tn("analysis.echo", realDevices.echo_devices?.length || 0), realDevices.echo_devices?.length > 0],
+    [tn("analysis.phones", realDevices.mobile_devices?.length || 0), realDevices.mobile_devices?.length > 0],
   ];
   return `
     <section class="insight-section">
-      <h4>Erkannte Geräte</h4>
+      <h4>${t("analysis.devices_title")}</h4>
       ${rows.map(([label, ok]) => renderInsightLine(label, ok ? "ok" : "unknown")).join("")}
     </section>
   `;
@@ -209,7 +192,7 @@ function renderRealDeviceSection(realDevices, integrations) {
 function renderFoundationSection(integrations) {
   return `
     <section class="insight-section">
-      <h4>Technische Grundlagen</h4>
+      <h4>${t("analysis.foundations_title")}</h4>
       ${renderInsightLine(`Zigbee: ${translateAnalysisValue(integrations.zigbee)}`, "unknown")}
       ${renderInsightLine(`MQTT: ${translateAnalysisValue(integrations.mqtt)}`, "unknown")}
       ${renderInsightLine(`Matter: ${translateAnalysisValue(integrations.matter)}`, "unknown")}
@@ -233,23 +216,23 @@ function renderTechnicalEntities(translated) {
   const tech = translated.technical_entities || {};
   const sensorGroups = translated.sensor_groups || {};
   const rows = [
-    ["Backup-System aktiv", tech.backup_sensors?.length || 0],
-    ["Wetter / Sonne vorhanden", (tech.sun_sensors?.length || 0) + (tech.weather_sensors?.length || 0)],
-    ["Systemsensoren", tech.system_sensors?.length || 0],
-    ["Über Alexa sichtbare Geräte", tech.alexa_visible_devices?.length || 0],
-    ["Klima / Umwelt", sensorGroups.climate_environment?.length || 0],
-    ["Bewegung / Präsenz", sensorGroups.motion_presence?.length || 0],
-    ["Energie", sensorGroups.energy?.length || 0],
-    ["Smartphone-Sensoren", sensorGroups.smartphone?.length || 0],
-    ["Sonstige Sensoren", sensorGroups.other?.length || 0],
+    [t("tech.backup"), tech.backup_sensors?.length || 0],
+    [t("tech.weather_sun"), (tech.sun_sensors?.length || 0) + (tech.weather_sensors?.length || 0)],
+    [t("tech.system"), tech.system_sensors?.length || 0],
+    [t("tech.alexa_visible"), tech.alexa_visible_devices?.length || 0],
+    [t("tech.climate"), sensorGroups.climate_environment?.length || 0],
+    [t("tech.motion"), sensorGroups.motion_presence?.length || 0],
+    [t("tech.energy"), sensorGroups.energy?.length || 0],
+    [t("tech.smartphone"), sensorGroups.smartphone?.length || 0],
+    [t("tech.other_sensors"), sensorGroups.other?.length || 0],
   ];
   return `
     <section class="technical-block">
-      <h4>Technische Systemfunktionen erkannt</h4>
+      <h4>${t("tech.title")}</h4>
       ${rows
         .filter(([, count]) => count > 0)
         .map(([label, count]) => renderInsightLine(`${label} (${count})`, "ok"))
-        .join("") || renderInsightLine("Keine technischen Systemfunktionen erkannt", "unknown")}
+        .join("") || renderInsightLine(t("tech.none"), "unknown")}
     </section>
   `;
 }
@@ -262,18 +245,18 @@ function renderLegacyGroups(analysis, homeAssistantUrl) {
 function buildTranslatedNextStep(translated) {
   const integrations = translated.integrations || {};
   if ([integrations.zigbee, integrations.mqtt, integrations.matter, integrations.thread].some((value) => value === "unknown")) {
-    return "Die wichtigsten Gerätefähigkeiten wurden erkannt. Für neue Geräte sollte Smart Guide als Nächstes klären, ob Zigbee, MQTT, Matter oder Thread vorhanden ist.";
+    return t("analysis.next.check_foundations");
   }
   if ((translated.capabilities || []).length > 0) {
-    return "Wähle jetzt aus, welches neue Gerät du hinzufügen möchtest. Smart Guide nutzt die erkannten Fähigkeiten als Kontext.";
+    return t("analysis.next.choose_device");
   }
-  return "Starte mit der manuellen Geräteauswahl. Smart Guide prüft danach, welcher Integrationsweg sinnvoll ist.";
+  return t("analysis.next.manual_start");
 }
 
 function renderAnalysisGroup(key, group, homeAssistantUrl) {
   const examples = group.examples?.length
     ? group.examples.map((name) => `<li>${name}</li>`).join("")
-    : "<li>Keine Geräte erkannt</li>";
+    : `<li>${t("analysis.no_devices")}</li>`;
   const entities = (group.entities || [])
     .map(
       (entity) => `
@@ -281,7 +264,7 @@ function renderAnalysisGroup(key, group, homeAssistantUrl) {
           <td>${entity.name}</td>
           <td><code>${entity.entity_id}</code></td>
           <td>${entity.status}</td>
-          <td>${entity.area}</td>
+          <td>${entity.area || t("common.unknown")}</td>
         </tr>
       `
     )
@@ -289,16 +272,16 @@ function renderAnalysisGroup(key, group, homeAssistantUrl) {
   return `
     <section class="analysis-group" data-group="${key}">
       <div class="analysis-group-head">
-        <h3>${group.label} (${group.count || 0})</h3>
-        <button class="secondary details-toggle" type="button" data-target="${key}">Technische Details anzeigen</button>
+        <h3>${t(`group.${key}`)} (${group.count || 0})</h3>
+        <button class="secondary details-toggle" type="button" data-target="${key}">${t("common.show_technical_details")}</button>
       </div>
       <ul>${examples}</ul>
       <div class="analysis-details hidden" id="details-${key}">
         <table>
-          <thead><tr><th>Name</th><th>Entity ID</th><th>Status</th><th>Bereich</th></tr></thead>
-          <tbody>${entities || '<tr><td colspan="4">Keine Entitäten gefunden</td></tr>'}</tbody>
+          <thead><tr><th>${t("table.name")}</th><th>Entity ID</th><th>${t("table.status")}</th><th>${t("table.area")}</th></tr></thead>
+          <tbody>${entities || `<tr><td colspan="4">${t("table.no_entities")}</td></tr>`}</tbody>
         </table>
-        ${homeAssistantUrl ? `<a class="ha-link" href="${homeAssistantUrl}" target="_blank" rel="noreferrer">In Home Assistant öffnen</a>` : ""}
+        ${homeAssistantUrl ? `<a class="ha-link" href="${homeAssistantUrl}" target="_blank" rel="noreferrer">${t("common.open_in_ha")}</a>` : ""}
       </div>
     </section>
   `;
@@ -314,7 +297,7 @@ function bindAnalysisDetails() {
       const status = await response.json();
       renderHaAnalysis({
         ok: false,
-        error: "Home Assistant Verbindung ändern",
+        error: t("connection.change_title"),
         needs_connection: true,
         default_url: status.default_url,
         analysis: null,
@@ -327,23 +310,15 @@ function bindAnalysisDetails() {
       const panel = document.getElementById(`details-${button.dataset.target}`);
       if (!panel) return;
       panel.classList.toggle("hidden");
-      button.textContent = panel.classList.contains("hidden") ? "Details anzeigen" : "Details ausblenden";
+      button.textContent = panel.classList.contains("hidden") ? t("common.show_details") : t("common.hide_details");
     });
   });
 }
 
-function renderCapabilityRow(label, detected) {
-  return `<div class="analysis-row ${detected ? "ok" : "unknown"}"><span>${detected ? icons.check : icons.clock}</span><strong>${label} ${detected ? "erkannt" : "nicht erkannt"}</strong></div>`;
-}
-
-function renderUnknownRow(label, value) {
-  return `<div class="analysis-row unknown"><span>${icons.clock}</span><strong>${label} ${translateAnalysisValue(value)}</strong></div>`;
-}
-
 function translateAnalysisValue(value) {
-  if (value === "unknown") return "unbekannt";
-  if (value === true) return "erkannt";
-  if (value === false) return "nicht erkannt";
+  if (value === "unknown") return t("value.unknown");
+  if (value === true) return t("value.detected");
+  if (value === false) return t("value.not_detected");
   return value;
 }
 
@@ -366,49 +341,49 @@ async function searchKnowledgeDevices(query) {
   if (!deviceSearchResults || !deviceDetailPanel) return;
   const trimmed = query.trim();
   if (!trimmed) {
-    setSearchStatus("Gib eine Modellnummer, einen Hersteller oder eine technische Kennung ein.", "muted");
+    setSearchStatus(t("search.empty_query"), "muted");
     deviceSearchResults.innerHTML = "";
     deviceDetailPanel.classList.add("hidden");
     return;
   }
 
-  setSearchStatus("Suche läuft...", "muted");
+  setSearchStatus(t("search.searching"), "muted");
   deviceSearchResults.innerHTML = "";
 
   try {
     const response = await fetch(`/devices/search?q=${encodeURIComponent(trimmed)}`);
-    if (!response.ok) throw new Error("API nicht erreichbar");
+    if (!response.ok) throw new Error(t("error.api_unreachable"));
     const result = await response.json();
     if (!result.ok) {
-      setSearchStatus(result.error || "API nicht erreichbar", "error");
+      setSearchStatus(result.error || t("error.api_unreachable"), "error");
       return;
     }
     renderSearchResults(result.items || []);
   } catch (error) {
-    setSearchStatus("API nicht erreichbar", "error");
+    setSearchStatus(t("error.api_unreachable"), "error");
   }
 }
 
 function renderSearchResults(items) {
   if (!deviceSearchResults) return;
   if (!items.length) {
-    setSearchStatus("Kein Gerät gefunden", "empty");
+    setSearchStatus(t("search.no_results"), "empty");
     deviceSearchResults.innerHTML = "";
     return;
   }
 
-  setSearchStatus(`${items.length} Treffer gefunden`, "success");
+  setSearchStatus(tn("search.results", items.length), "success");
   deviceSearchResults.innerHTML = items
     .map(
       (item) => `
         <button class="device-result" type="button" data-device-id="${item.device_id}">
           <span>
             <strong>${escapeHtml(item.vendor)} ${escapeHtml(item.model)}</strong>
-            <small>${escapeHtml(item.display_name || "Ohne Anzeigename")}</small>
+            <small>${escapeHtml(item.display_name || t("device.no_display_name"))}</small>
           </span>
           <span class="device-meta">
-            <em>${escapeHtml(item.protocol || "unbekannt")}</em>
-            <em>${escapeHtml(item.match_type || "Treffer")}</em>
+            <em>${escapeHtml(item.protocol || t("common.unknown_lower"))}</em>
+            <em>${escapeHtml(item.match_type ? t(`match.${item.match_type}`) : t("search.match"))}</em>
           </span>
         </button>
       `
@@ -423,21 +398,21 @@ function renderSearchResults(items) {
 async function loadDeviceDetails(deviceId) {
   if (!deviceDetailPanel) return;
   deviceDetailPanel.classList.remove("hidden");
-  deviceDetailPanel.innerHTML = `<div class="detail-loading"><span class="analysis-spinner"></span><strong>Details werden geladen...</strong></div>`;
+  deviceDetailPanel.innerHTML = `<div class="detail-loading"><span class="analysis-spinner"></span><strong>${t("device.loading_details")}</strong></div>`;
 
   try {
     const response = await fetch(`/devices/${encodeURIComponent(deviceId)}`);
-    if (!response.ok) throw new Error("API nicht erreichbar");
+    if (!response.ok) throw new Error(t("error.api_unreachable"));
     const result = await response.json();
     if (!result.ok) {
-      deviceDetailPanel.innerHTML = `<div class="device-detail-error">${escapeHtml(result.error || "Gerät konnte nicht geladen werden")}</div>`;
+      deviceDetailPanel.innerHTML = `<div class="device-detail-error">${escapeHtml(result.error || t("device.load_failed"))}</div>`;
       return;
     }
     state.selectedKnowledgeDevice = result.device;
     renderDeviceDetails(result);
     render();
   } catch (error) {
-    deviceDetailPanel.innerHTML = `<div class="device-detail-error">API nicht erreichbar</div>`;
+    deviceDetailPanel.innerHTML = `<div class="device-detail-error">${t("error.api_unreachable")}</div>`;
   }
 }
 
@@ -447,31 +422,31 @@ function renderDeviceDetails(result) {
   deviceDetailPanel.innerHTML = `
     <div class="device-detail-head">
       <div>
-        <p class="eyebrow">Ausgewähltes Gerät</p>
+        <p class="eyebrow">${t("device.selected")}</p>
         <h3>${escapeHtml(device.display_name || `${device.canonical_vendor} ${device.canonical_model}`)}</h3>
-        <p>${escapeHtml(device.description || "Keine Beschreibung vorhanden.")}</p>
+        <p>${escapeHtml(device.description || t("device.no_description"))}</p>
       </div>
-      <span>${escapeHtml(device.protocol || "unbekannt")}</span>
+      <span>${escapeHtml(device.protocol || t("common.unknown_lower"))}</span>
     </div>
     <div class="device-detail-grid">
-      ${renderDetailList("Varianten", result.variants || [], (item) => [
+      ${renderDetailList(t("device.variants"), result.variants || [], (item) => [
         item.variant_name,
         item.model_number,
         item.region,
       ])}
-      ${renderDetailList("Technische Identifier", result.identifiers || [], (item) => [
+      ${renderDetailList(t("device.identifiers"), result.identifiers || [], (item) => [
         item.identifier_type,
         item.identifier_value,
         item.source,
       ])}
-      ${renderDetailList("Capabilities", result.capabilities || [], (item) => [
+      ${renderDetailList(t("device.capabilities"), result.capabilities || [], (item) => [
         item.capability,
         summarizeCapability(item.value),
         item.source,
       ])}
-      ${renderDetailList("Kompatibilität", result.compatibility || [], (item) => [
+      ${renderDetailList(t("device.compatibility"), result.compatibility || [], (item) => [
         item.platform,
-        item.supported ? "unterstützt" : "nicht unterstützt",
+        item.supported ? t("device.supported") : t("device.not_supported"),
         item.notes,
       ])}
     </div>
@@ -483,11 +458,11 @@ function renderDetailList(title, items, mapItem) {
     const values = mapItem(item).filter((value) => value !== null && value !== undefined && value !== "");
     return `<li>${values.map((value) => `<span>${escapeHtml(value)}</span>`).join("")}</li>`;
   });
-  const more = items.length > 12 ? `<p>${items.length - 12} weitere Einträge vorhanden.</p>` : "";
+  const more = items.length > 12 ? `<p>${tn("device.more_entries", items.length - 12)}</p>` : "";
   return `
     <section class="detail-section">
       <h4>${escapeHtml(title)} (${items.length})</h4>
-      <ul>${rows.join("") || "<li><span>Keine Daten vorhanden</span></li>"}</ul>
+      <ul>${rows.join("") || `<li><span>${t("device.no_data")}</span></li>`}</ul>
       ${more}
     </section>
   `;
@@ -500,28 +475,26 @@ function summarizeCapability(value) {
 }
 
 function formatAnalysisTime(value) {
-  if (!value) return "gerade eben";
-  const diffMs = Date.now() - new Date(value).getTime();
-  const minutes = Math.max(0, Math.round(diffMs / 60000));
-  if (minutes < 1) return "gerade eben";
-  if (minutes === 1) return "vor 1 Minute";
-  return `vor ${minutes} Minuten`;
+  if (!value) return t("time.just_now");
+  const minutes = Math.max(0, Math.round((Date.now() - new Date(value).getTime()) / 60000));
+  if (minutes < 1) return t("time.just_now");
+  return new Intl.RelativeTimeFormat(i18n.lang, { numeric: "auto" }).format(-minutes, "minute");
 }
 
 function renderConnectionFormMarkup(defaultUrl = "http://homeassistant.local:8123") {
   return `
     <form class="token-form" id="haConnectionForm">
-      <h3>Home Assistant verbinden</h3>
+      <h3>${t("connection.title")}</h3>
       <label>
-        <span>Home Assistant URL</span>
+        <span>${t("connection.url")}</span>
         <input id="haUrlInput" type="url" autocomplete="url" value="${defaultUrl || "http://homeassistant.local:8123"}" placeholder="http://homeassistant.local:8123" />
       </label>
       <label>
-        <span>Long-Lived Access Token</span>
-        <input id="haTokenInput" type="password" autocomplete="off" placeholder="Token einfügen" />
+        <span>${t("connection.token")}</span>
+        <input id="haTokenInput" type="password" autocomplete="off" placeholder="${t("connection.token_placeholder")}" />
       </label>
-      <button class="primary" type="submit">Verbindung testen</button>
-      <small>Smart Guide bleibt auch ohne Verbindung bedienbar. Der Token wird nicht angezeigt.</small>
+      <button class="primary" type="submit">${t("connection.test")}</button>
+      <small>${t("connection.hint")}</small>
     </form>
   `;
 }
@@ -539,7 +512,7 @@ function bindConnectionForm() {
     if (!url || !token) return;
 
     haAnalysisState.className = "analysis-state";
-    haAnalysisState.innerHTML = `<span class="analysis-spinner"></span><strong>Analyse läuft...</strong>`;
+    haAnalysisState.innerHTML = `<span class="analysis-spinner"></span><strong>${t("analysis.running")}</strong>`;
 
     try {
       const response = await fetch("/api/home-assistant-token", {
@@ -551,7 +524,7 @@ function bindConnectionForm() {
       if (!result.ok) {
         renderHaAnalysis({
           ok: false,
-          error: result.error || "Home Assistant nicht verbunden",
+          error: result.error || t("error.ha_not_connected"),
           needs_connection: true,
           default_url: url,
           analysis: null,
@@ -560,7 +533,7 @@ function bindConnectionForm() {
       }
       await loadHomeAssistantAnalysis();
     } catch (error) {
-      renderHaAnalysis({ ok: false, error: "Home Assistant nicht erreichbar", needs_connection: true, default_url: url, analysis: null });
+      renderHaAnalysis({ ok: false, error: t("error.ha_unreachable"), needs_connection: true, default_url: url, analysis: null });
     }
   });
 }
@@ -568,12 +541,12 @@ function bindConnectionForm() {
 async function loadHomeAssistantAnalysis() {
   if (!haAnalysisState) return;
   haAnalysisState.className = "analysis-state";
-  haAnalysisState.innerHTML = `<span class="analysis-spinner"></span><strong>Analyse läuft...</strong>`;
+  haAnalysisState.innerHTML = `<span class="analysis-spinner"></span><strong>${t("analysis.running")}</strong>`;
   try {
     const response = await fetch("/api/home-assistant-scan");
     renderHaAnalysis(await response.json());
   } catch (error) {
-    renderHaAnalysis({ ok: false, error: "Home Assistant nicht erreichbar", needs_connection: false, analysis: null });
+    renderHaAnalysis({ ok: false, error: t("error.ha_unreachable"), needs_connection: false, analysis: null });
   }
 }
 
@@ -585,7 +558,7 @@ async function initializeHomeAssistantAnalysis() {
     if (!status.connected) {
       renderHaAnalysis({
         ok: false,
-        error: "Home Assistant nicht verbunden",
+        error: t("error.ha_not_connected"),
         needs_connection: true,
         default_url: status.default_url,
         analysis: null,
@@ -596,7 +569,7 @@ async function initializeHomeAssistantAnalysis() {
   } catch (error) {
     renderHaAnalysis({
       ok: false,
-      error: "Home Assistant nicht erreichbar",
+      error: t("error.ha_unreachable"),
       needs_connection: true,
       default_url: "http://homeassistant.local:8123",
       analysis: null,
@@ -680,7 +653,7 @@ function renderSelect(label, options, value, onChange) {
   const select = document.createElement("select");
   const placeholder = document.createElement("option");
   placeholder.value = "";
-  placeholder.textContent = "Bitte auswählen";
+  placeholder.textContent = t("common.please_select");
   select.appendChild(placeholder);
   options.forEach((option) => {
     const item = document.createElement("option");
@@ -699,17 +672,18 @@ function renderSelect(label, options, value, onChange) {
 
 function protocolToConnection(protocol) {
   const normalized = String(protocol || "").toLowerCase();
-  if (normalized === "zigbee") return "Zigbee";
-  if (normalized === "matter") return "Matter";
-  if (normalized === "bluetooth") return "Bluetooth";
-  if (normalized === "wifi" || normalized === "wlan") return "WLAN";
-  return "";
+  if (normalized === "wifi" || normalized === "wlan") return "wifi";
+  return tree.connections.some((connection) => connection.id === normalized) ? normalized : "";
+}
+
+function connectionLabel(id) {
+  return tree.connections.find((connection) => connection.id === id)?.title || id;
 }
 
 function capabilityLabel(capability) {
   const value = capability?.value || {};
   if (typeof value === "string") return capability.capability || value;
-  return value.name || value.property || capability.capability || value.type || "Fähigkeit";
+  return value.name || value.property || capability.capability || value.type || t("device.capability");
 }
 
 function knowledgeCapabilities(details, limit = 5) {
@@ -721,8 +695,8 @@ function knowledgeCapabilities(details, limit = 5) {
 
 function knowledgeDeviceLabel(device) {
   if (!device) return "";
-  const vendor = device.vendor || device.canonical_vendor || "Unbekannter Hersteller";
-  const model = device.model || device.canonical_model || "Unbekanntes Modell";
+  const vendor = device.vendor || device.canonical_vendor || t("device.unknown_vendor");
+  const model = device.model || device.canonical_model || t("device.unknown_model");
   return `${vendor} ${model}`;
 }
 
@@ -741,11 +715,11 @@ function renderKnowledgeContext() {
   const platforms = supportedPlatforms(details);
   return `
     <span class="guide-context">
-      <strong>Knowledge-Kontext</strong>
+      <strong>${t("knowledge.context")}</strong>
       <span>${escapeHtml(device.vendor || device.canonical_vendor)} ${escapeHtml(device.model || device.canonical_model)}</span>
-      <small>Protokoll: ${escapeHtml(device.protocol || "unbekannt")}</small>
-      ${capabilities.length ? `<small>Fähigkeiten: ${capabilities.map(escapeHtml).join(", ")}</small>` : ""}
-      ${platforms.length ? `<small>Kompatibel mit: ${platforms.map(escapeHtml).join(", ")}</small>` : ""}
+      <small>${t("knowledge.protocol", { protocol: escapeHtml(device.protocol || t("common.unknown_lower")) })}</small>
+      ${capabilities.length ? `<small>${t("knowledge.capabilities", { list: capabilities.map(escapeHtml).join(", ") })}</small>` : ""}
+      ${platforms.length ? `<small>${t("knowledge.compatible_with", { list: platforms.map(escapeHtml).join(", ") })}</small>` : ""}
     </span>
   `;
 }
@@ -754,14 +728,14 @@ async function loadKnowledgeVendors() {
   if (knowledgeWizard.vendors) return;
   try {
     const response = await fetch("/vendors");
-    if (!response.ok) throw new Error("API nicht erreichbar");
+    if (!response.ok) throw new Error(t("error.api_unreachable"));
     const result = await response.json();
-    if (!result.ok) throw new Error(result.error || "API nicht erreichbar");
+    if (!result.ok) throw new Error(result.error || t("error.api_unreachable"));
     knowledgeWizard.vendors = (result.items || []).map((item) => item.vendor).filter(Boolean);
     knowledgeWizard.vendorsError = "";
   } catch (error) {
     knowledgeWizard.vendors = null;
-    knowledgeWizard.vendorsError = "Knowledge-API nicht erreichbar. Statische Hersteller werden verwendet.";
+    knowledgeWizard.vendorsError = t("knowledge.vendors_error");
   }
   render();
 }
@@ -770,14 +744,14 @@ async function loadKnowledgeDevicesForVendor(vendor) {
   if (!vendor || knowledgeWizard.devicesByVendor[vendor] || knowledgeWizard.devicesErrorByVendor[vendor]) return;
   try {
     const response = await fetch(`/devices/by-vendor?vendor=${encodeURIComponent(vendor)}`);
-    if (!response.ok) throw new Error("API nicht erreichbar");
+    if (!response.ok) throw new Error(t("error.api_unreachable"));
     const result = await response.json();
-    if (!result.ok) throw new Error(result.error || "API nicht erreichbar");
+    if (!result.ok) throw new Error(result.error || t("error.api_unreachable"));
     knowledgeWizard.devicesByVendor[vendor] = result.items || [];
     knowledgeWizard.devicesErrorByVendor[vendor] = "";
   } catch (error) {
     knowledgeWizard.devicesByVendor[vendor] = null;
-    knowledgeWizard.devicesErrorByVendor[vendor] = "Knowledge-API nicht erreichbar. Statische Modellwerte werden verwendet.";
+    knowledgeWizard.devicesErrorByVendor[vendor] = t("knowledge.devices_error");
   }
   render();
 }
@@ -805,8 +779,7 @@ async function selectKnowledgeDevice(device) {
 function renderManufacturerStep() {
   const wrap = document.createElement("div");
   wrap.className = "wizard-stack";
-  const fallback = tree.manufacturers[state.category] || [];
-  const vendors = knowledgeWizard.vendors || fallback;
+  const vendors = knowledgeWizard.vendors || [];
   if (knowledgeWizard.vendorsError) {
     const notice = document.createElement("p");
     notice.className = "inline-warning";
@@ -814,7 +787,7 @@ function renderManufacturerStep() {
     wrap.appendChild(notice);
   }
   wrap.appendChild(
-    renderSelect("Hersteller", vendors, state.manufacturer, (value) => {
+    renderSelect(t("profile.manufacturer"), vendors, state.manufacturer, (value) => {
       state.manufacturer = value;
       resetDependentAnswers(1);
       loadKnowledgeDevicesForVendor(value);
@@ -834,8 +807,8 @@ function renderKnowledgeModels(devices) {
   wrap.className = "model-picker";
   wrap.innerHTML = `
     <label class="field model-filter">
-      <span>Modell suchen</span>
-      <input id="modelFilterInput" type="search" value="${escapeHtml(knowledgeWizard.modelFilter)}" placeholder="z. B. TS011F" />
+      <span>${t("wizard.model_search")}</span>
+      <input id="modelFilterInput" type="search" value="${escapeHtml(knowledgeWizard.modelFilter)}" placeholder="${t("search.placeholder")}" />
     </label>
   `;
   const filterInput = wrap.querySelector("#modelFilterInput");
@@ -853,20 +826,20 @@ function renderKnowledgeModels(devices) {
     button.className = state.selectedKnowledgeDevice?.device_id === device.device_id ? "model-card active" : "model-card";
     button.innerHTML = `
       <strong>${escapeHtml(device.vendor)} ${escapeHtml(device.model)}</strong>
-      <small>${escapeHtml(device.display_name || "Ohne Anzeigename")}</small>
-      <em>${escapeHtml(device.protocol || "unbekannt")}${device.device_type ? ` · ${escapeHtml(device.device_type)}` : ""}</em>
+      <small>${escapeHtml(device.display_name || t("device.no_display_name"))}</small>
+      <em>${escapeHtml(device.protocol || t("common.unknown_lower"))}${device.device_type ? ` · ${escapeHtml(device.device_type)}` : ""}</em>
     `;
     button.addEventListener("click", () => selectKnowledgeDevice(device));
     grid.appendChild(button);
   });
   if (!filtered.length) {
-    grid.innerHTML = `<p class="empty-state">Keine Geräte für diesen Hersteller gefunden.</p>`;
+    grid.innerHTML = `<p class="empty-state">${t("wizard.no_devices_for_vendor")}</p>`;
   }
   wrap.appendChild(grid);
   if (filtered.length > 80) {
     const hint = document.createElement("p");
     hint.className = "inline-hint";
-    hint.textContent = `${filtered.length} Geräte gefunden. Verfeinere die Suche, um die Liste einzugrenzen.`;
+    hint.textContent = t("wizard.too_many_devices", { count: filtered.length });
     wrap.appendChild(hint);
   }
   return wrap;
@@ -876,7 +849,7 @@ function renderModelStep() {
   const wrap = document.createElement("div");
   wrap.className = "wizard-stack";
   if (!state.manufacturer) {
-    wrap.innerHTML = `<p class="empty-state">Wähle zuerst einen Hersteller.</p>`;
+    wrap.innerHTML = `<p class="empty-state">${t("wizard.choose_vendor_first")}</p>`;
     return wrap;
   }
 
@@ -887,23 +860,17 @@ function renderModelStep() {
     notice.className = "inline-warning";
     notice.textContent = error;
     wrap.appendChild(notice);
-    wrap.appendChild(
-      renderSelect("Modell", tree.models[state.manufacturer] || tree.models.Sonstiger, state.model, (value) => {
-        state.model = value;
-        resetDependentAnswers(2);
-      })
-    );
     return wrap;
   }
 
   if (!devices) {
-    wrap.innerHTML = `<div class="detail-loading"><span class="analysis-spinner"></span><strong>Geräte werden geladen...</strong></div>`;
+    wrap.innerHTML = `<div class="detail-loading"><span class="analysis-spinner"></span><strong>${t("wizard.loading_devices")}</strong></div>`;
     loadKnowledgeDevicesForVendor(state.manufacturer);
     return wrap;
   }
 
   if (!devices.length) {
-    wrap.innerHTML = `<p class="empty-state">Keine Geräte für diesen Hersteller gefunden.</p>`;
+    wrap.innerHTML = `<p class="empty-state">${t("wizard.no_devices_for_vendor")}</p>`;
     return wrap;
   }
 
@@ -927,9 +894,9 @@ function capabilityStatus(item) {
 }
 
 function statusText(status) {
-  if (status === "detected") return "Erkannt";
-  if (status === "missing") return "Fehlt";
-  return "Unklar";
+  if (status === "detected") return t("status.detected");
+  if (status === "missing") return t("status.missing");
+  return t("status.unknown");
 }
 
 function statusIcon(status) {
@@ -942,38 +909,13 @@ function statusClass(status) {
   return status === "detected" ? "detected" : status === "missing" ? "missing" : "unknown";
 }
 
-function unsupportedConnection() {
-  const allowed = tree.compatibility?.[state.manufacturer];
-  return Boolean(allowed && state.connection && !allowed.includes(state.connection));
-}
-
 function evaluatePath() {
   const analysis = compatibilityCheck();
   if (analysis) return analysis;
 
-  if (unsupportedConnection()) {
-    return {
-      status: "blocked",
-      title: "Verbindungstyp wird nicht unterstützt",
-      reason: `${state.manufacturer} wird in Smart Guide aktuell nicht sinnvoll über ${state.connection} geführt.`,
-      action: `Wähle einen unterstützten Verbindungstyp: ${(tree.compatibility[state.manufacturer] || []).join(", ")}.`,
-      items: [],
-    };
-  }
-
   const checks = infrastructureItems().map((item) => ({ ...item, status: capabilityStatus(item) }));
   const missing = checks.filter((item) => item.status === "missing");
   const unknown = checks.filter((item) => item.status === "unknown");
-
-  if (state.manufacturer === "Sonstiger" && state.model === "Modell unbekannt") {
-    return {
-      status: "blocked",
-      title: "Integration existiert nicht oder ist unbekannt",
-      reason: "Ohne Hersteller- oder Modellinformation kann Smart Guide keine passende Home Assistant Integration bestimmen.",
-      action: "Ermittle Hersteller, Modellnummer oder Funkstandard am Gerät, auf der Verpackung oder in der Hersteller-App.",
-      items: checks,
-    };
-  }
 
   if (missing.length > 0) {
     const hardwareMissing = missing.find((item) =>
@@ -981,8 +923,8 @@ function evaluatePath() {
     );
     return {
       status: "missing",
-      title: hardwareMissing ? "Zusätzliche Hardware erforderlich" : "Voraussetzungen fehlen",
-      reason: `${missing.length} Voraussetzung${missing.length === 1 ? "" : "en"} fehlen für diesen Integrationsweg.`,
+      title: hardwareMissing ? t("result.hardware_required") : t("result.requirements_missing"),
+      reason: tn("result.n_missing", missing.length),
       action: missing[0].action,
       items: checks,
     };
@@ -991,53 +933,20 @@ function evaluatePath() {
   if (unknown.length > 0) {
     return {
       status: "unknown",
-      title: "Noch nicht sicher integrierbar",
-      reason: "Einige Informationen konnten nicht automatisch aus Home Assistant ermittelt werden.",
-      action: "Beantworte die offenen Rückfragen oder verbinde Smart Guide später direkt mit Home Assistant.",
+      title: t("result.not_yet_certain"),
+      reason: t("result.not_yet_certain_reason"),
+      action: t("result.not_yet_certain_action"),
       items: checks,
     };
   }
 
   return {
     status: "ready",
-    title: "Integrationsweg möglich",
-    reason: tree.recommendations[state.connection] || "Der gewählte Pfad ist grundsätzlich möglich.",
-    action: "Öffne jetzt die passende Home Assistant Integration und starte erst danach die konkrete Geräteeinbindung.",
+    title: t("result.path_possible"),
+    reason: tree.recommendations[state.connection] || t("result.path_possible_reason"),
+    action: t("result.path_possible_action"),
     items: checks,
   };
-}
-
-function normalizeAnalysisStatus(status) {
-  if (status === "integratable") return "ready";
-  if (status === "missing_requirements") return "missing";
-  if (status === "not_compatible") return "blocked";
-  return "unknown";
-}
-
-function findDeviceEntry() {
-  const exact = (tree.device_database || []).find(
-    (device) =>
-      device.category === state.category &&
-      device.manufacturer === state.manufacturer &&
-      device.model === state.model &&
-      device.connection === state.connection
-  );
-  if (exact) return { device: exact };
-
-  const sameModel = (tree.device_database || []).find(
-    (device) =>
-      device.category === state.category &&
-      device.manufacturer === state.manufacturer &&
-      device.model === state.model
-  );
-  if (sameModel) return { device: sameModel, connectionMismatch: true };
-
-  const sameManufacturer = (tree.device_database || []).find(
-    (device) => device.category === state.category && device.manufacturer === state.manufacturer
-  );
-  if (sameManufacturer) return { device: sameManufacturer, unknownModel: true };
-
-  return null;
 }
 
 function compatibilityCheck() {
@@ -1048,28 +957,31 @@ function compatibilityCheck() {
     const capabilities = knowledgeCapabilities(details, 6);
     const checks = [
       {
-        label: "Knowledge-Datenbank",
+        label: t("check.catalog"),
         state: "present",
-        detail: "Gerät gefunden.",
+        detail: t("check.device_found"),
       },
       {
-        label: "Protokoll",
+        label: t("check.protocol"),
         state: device.protocol ? "present" : "unknown",
-        detail: device.protocol || "unbekannt",
+        detail: device.protocol || t("common.unknown_lower"),
       },
       {
-        label: "Kompatibilität",
+        label: t("check.compatibility"),
         state: platforms.length ? "present" : "unknown",
-        detail: platforms.length ? platforms.join(", ") : "Noch keine Plattformbewertung vorhanden.",
+        detail: platforms.length ? platforms.join(", ") : t("check.no_platform_rating"),
       },
     ];
     return {
       status: "ready",
-      title: "Gerät in der Knowledge-Datenbank gefunden",
-      reason: `${device.vendor || device.canonical_vendor} ${device.model || device.canonical_model} ist als ${device.protocol || "Gerät"} hinterlegt.`,
+      title: t("result.found_in_catalog"),
+      reason: t("result.found_in_catalog_reason", {
+        device: knowledgeDeviceLabel(device),
+        protocol: device.protocol || t("result.device_generic"),
+      }),
       action: platforms.length
-        ? `Empfohlener Integrationsweg: ${platforms[0]}. SmartGuide führt dich jetzt durch den Such- und Kopplungsprozess.`
-        : "Nutze das erkannte Protokoll als Integrationspfad. SmartGuide führt dich jetzt durch den Such- und Kopplungsprozess.",
+        ? t("result.recommended_path", { platform: platforms[0] })
+        : t("result.use_protocol_path"),
       checks,
       integrations: platforms.length ? platforms : ["Zigbee2MQTT"],
       capabilitySummary: capabilities,
@@ -1077,104 +989,7 @@ function compatibilityCheck() {
     };
   }
 
-  const match = findDeviceEntry();
-  const haStatus = state.liveHaStatus || tree.ha_status || {};
-  if (!match) {
-    return {
-      status: "unknown",
-      title: "Gerät nicht in der Datenbank",
-      reason: "Für diese Kombination aus Hersteller, Modell und Verbindung liegen noch keine belastbaren Daten vor.",
-      action: "Hersteller, Modellnummer und Funkstandard prüfen oder das Gerät als neues Datenbankprofil ergänzen.",
-      checks: [{ label: "Gerätedatenbank", state: "unknown", detail: "Kein passender Eintrag gefunden." }],
-      integrations: [],
-    };
-  }
-
-  if (match.connectionMismatch) {
-    return {
-      status: "blocked",
-      title: "Verbindungstyp wird nicht unterstützt",
-      reason: `${state.manufacturer} ${state.model} ist bekannt, aber nicht mit ${state.connection} hinterlegt.`,
-      action: `Wähle einen bekannten Verbindungstyp für dieses Gerät, zum Beispiel ${match.device.connection}.`,
-      checks: [
-        { label: "Gerät bekannt", state: "present", detail: `${state.manufacturer} ${state.model}` },
-        { label: "Verbindung", state: "missing", detail: `${state.connection} nicht unterstützt.` },
-      ],
-      integrations: match.device.possible_integrations,
-    };
-  }
-
-  if (match.unknownModel) {
-    return {
-      status: "unknown",
-      title: "Modell noch nicht eindeutig bekannt",
-      reason: `${state.manufacturer} ist bekannt, aber dieses Modell ist noch nicht sicher bewertet.`,
-      action: "Modellnummer prüfen und mit der Gerätedatenbank abgleichen.",
-      checks: [
-        { label: "Hersteller", state: "present", detail: state.manufacturer },
-        { label: "Modell", state: "unknown", detail: state.model },
-      ],
-      integrations: match.device.possible_integrations,
-    };
-  }
-
-  const device = match.device;
-  if (device.compatibility_status === "unclear") {
-    return {
-      status: "unknown",
-      title: "Kompatibilität unklar",
-      reason: "Die Datenbank kennt das Gerät, bewertet die Integration aber noch nicht sicher.",
-      action: "Offizielle Home-Assistant-Integration und Community-Berichte prüfen.",
-      checks: [{ label: "Kompatibilität", state: "unknown", detail: "Noch nicht verifiziert." }],
-      integrations: device.possible_integrations,
-    };
-  }
-
-  if (device.compatibility_status === "not_supported") {
-    return {
-      status: "blocked",
-      title: "Gerät aktuell nicht integrierbar",
-      reason: "Die Gerätedatenbank markiert dieses Gerät aktuell als nicht kompatibel.",
-      action: "Alternative Verbindung oder anderes Gerät wählen.",
-      checks: [{ label: "Kompatibilität", state: "missing", detail: "Nicht kompatibel." }],
-      integrations: device.possible_integrations,
-    };
-  }
-
-  const checks = device.required_infrastructure.map((infra) => ({
-    label: infrastructureLabel(infra),
-    state: haStatus[infra] ? "present" : "missing",
-    detail: haStatus[infra] ? "vorhanden" : "fehlt",
-  }));
-
-  if (checks.length === 0) {
-    checks.push({
-      label: "Zusätzliche Infrastruktur",
-      state: "present",
-      detail: "Keine zusätzliche Infrastruktur erforderlich.",
-    });
-  }
-
-  const missing = checks.filter((check) => check.state === "missing");
-  if (missing.length > 0) {
-    return {
-      status: "missing",
-      title: "Voraussetzungen fehlen",
-      reason: `Für diesen Integrationsweg fehlen: ${missing.map((check) => check.label).join(", ")}.`,
-      action: `Richte zuerst ${missing[0].label} ein und starte die Analyse danach erneut.`,
-      checks,
-      integrations: device.possible_integrations,
-    };
-  }
-
-  return {
-    status: "ready",
-    title: "Gerät integrierbar",
-    reason: "Die benötigte Infrastruktur ist laut Analyse vorhanden.",
-    action: `Nutze die Integration ${device.possible_integrations[0]} und starte danach die konkrete Geräteeinbindung.`,
-    checks,
-    integrations: device.possible_integrations,
-  };
+  return null;
 }
 
 function shouldShowZigbeePairing(evaluation) {
@@ -1184,9 +999,9 @@ function shouldShowZigbeePairing(evaluation) {
 function pairingInstructionText() {
   const model = String(state.model || "").toLowerCase();
   if (model.includes("ts011f")) {
-    return "Bei vielen TS011F-Steckdosen die Taste etwa 5-10 Sekunden halten, bis die LED schnell blinkt.";
+    return t("pairing.instruction_ts011f");
   }
-  return "Meist Reset-Taste 5-10 Sekunden halten, bis die LED blinkt.";
+  return t("pairing.instruction_generic");
 }
 
 function renderPairingFlow(evaluation) {
@@ -1197,34 +1012,34 @@ function renderPairingFlow(evaluation) {
     <div class="pairing-head">
       <span>${icons.radio}</span>
       <div>
-        <h3>Zigbee-Gerät verbinden</h3>
-        <p>SmartGuide begleitet dich jetzt durch Pairing und Suche.</p>
+        <h3>${t("pairing.title")}</h3>
+        <p>${t("pairing.subtitle")}</p>
       </div>
     </div>
     <ol class="pairing-steps">
       <li class="${state.pairing.ready ? "done" : "active"}">
-        <strong>1. Gerät in Suchmodus versetzen</strong>
-        <span>Setze das Gerät jetzt in den Pairing-Modus. ${pairingInstructionText()}</span>
+        <strong>${t("pairing.step1_title")}</strong>
+        <span>${t("pairing.step1_body")} ${pairingInstructionText()}</span>
       </li>
       <li class="${state.pairing.phase === "searching" ? "active" : state.pairing.phase === "found" ? "done" : ""}">
-        <strong>2. Suche in Home Assistant starten</strong>
-        <span>SmartGuide startet den vorbereiteten Suchmodus oder meldet klar, was noch fehlt.</span>
+        <strong>${t("pairing.step2_title")}</strong>
+        <span>${t("pairing.step2_body")}</span>
       </li>
       <li class="${state.pairing.phase === "found" ? "done" : state.pairing.phase === "not_found" ? "active" : ""}">
-        <strong>3. Neues Gerät prüfen</strong>
-        <span>Danach wird geprüft, ob Home Assistant ein neues Gerät meldet.</span>
+        <strong>${t("pairing.step3_title")}</strong>
+        <span>${t("pairing.step3_body")}</span>
       </li>
     </ol>
     <div class="pairing-actions">
-      <button class="secondary" type="button" id="pairingReadyBtn" ${state.pairing.ready ? "disabled" : ""}>Gerät ist im Suchmodus</button>
-      <button class="primary" type="button" id="startPairingBtn" ${state.pairing.ready && state.pairing.phase !== "searching" ? "" : "disabled"}>Suche in Home Assistant starten</button>
+      <button class="secondary" type="button" id="pairingReadyBtn" ${state.pairing.ready ? "disabled" : ""}>${t("pairing.ready_button")}</button>
+      <button class="primary" type="button" id="startPairingBtn" ${state.pairing.ready && state.pairing.phase !== "searching" ? "" : "disabled"}>${t("pairing.start_button")}</button>
     </div>
     ${renderPairingState(haUrl)}
   `;
   wrap.querySelector("#pairingReadyBtn")?.addEventListener("click", () => {
     state.pairing.ready = true;
     state.pairing.phase = "ready";
-    state.pairing.message = "Gut. Starte jetzt die Suche in Home Assistant.";
+    state.pairing.message = t("pairing.ready_message");
     render();
   });
   wrap.querySelector("#startPairingBtn")?.addEventListener("click", startZigbeePairing);
@@ -1237,23 +1052,23 @@ function renderPairingState(haUrl) {
     return `<div class="pairing-state ready">${icons.check}<span>${escapeHtml(state.pairing.message)}</span></div>`;
   }
   if (state.pairing.phase === "searching") {
-    return `<div class="pairing-state searching"><span class="analysis-spinner"></span><span>Suche läuft...</span></div>`;
+    return `<div class="pairing-state searching"><span class="analysis-spinner"></span><span>${t("pairing.searching")}</span></div>`;
   }
   if (state.pairing.phase === "found") {
     return `
-      <div class="pairing-state found">${icons.check}<span>Gerät verbunden</span></div>
-      <a class="ha-link" href="${escapeHtml(haUrl)}" target="_blank" rel="noreferrer">Home Assistant Geräteübersicht öffnen</a>
+      <div class="pairing-state found">${icons.check}<span>${t("pairing.found")}</span></div>
+      <a class="ha-link" href="${escapeHtml(haUrl)}" target="_blank" rel="noreferrer">${t("pairing.open_devices")}</a>
     `;
   }
   return `
-    <div class="pairing-state not-found">${icons.alert}<span>${escapeHtml(state.pairing.message || "Noch nicht gefunden")}</span></div>
+    <div class="pairing-state not-found">${icons.alert}<span>${escapeHtml(state.pairing.message || t("pairing.not_found"))}</span></div>
     <ul class="pairing-hints">
-      <li>Gerät näher an den Coordinator bringen</li>
-      <li>Pairing erneut starten</li>
-      <li>Batterie oder Stromversorgung prüfen</li>
-      <li>Zigbee2MQTT- oder ZHA-Logs prüfen</li>
+      <li>${t("pairing.hint_closer")}</li>
+      <li>${t("pairing.hint_retry")}</li>
+      <li>${t("pairing.hint_power")}</li>
+      <li>${t("pairing.hint_logs")}</li>
     </ul>
-    <a class="ha-link" href="${escapeHtml(haUrl)}" target="_blank" rel="noreferrer">Home Assistant Geräteübersicht öffnen</a>
+    <a class="ha-link" href="${escapeHtml(haUrl)}" target="_blank" rel="noreferrer">${t("pairing.open_devices")}</a>
   `;
 }
 
@@ -1271,7 +1086,7 @@ async function startZigbeePairing() {
     state.pairing.homeAssistantUrl = result.home_assistant_url || state.pairing.homeAssistantUrl;
     if (!result.ok) {
       state.pairing.phase = "not_found";
-      state.pairing.message = result.message || result.error || "Automatischer Suchmodus ist vorbereitet, aber noch nicht verbunden.";
+      state.pairing.message = result.message || result.error || t("pairing.not_connected_fallback");
       render();
       return;
     }
@@ -1281,28 +1096,16 @@ async function startZigbeePairing() {
     state.pairing.homeAssistantUrl = recent.home_assistant_url || state.pairing.homeAssistantUrl;
     if (recent.ok && recent.items?.length) {
       state.pairing.phase = "found";
-      state.pairing.message = "Gerät verbunden";
+      state.pairing.message = t("pairing.found");
     } else {
       state.pairing.phase = "not_found";
-      state.pairing.message = recent.message || "Noch nicht gefunden";
+      state.pairing.message = recent.message || t("pairing.not_found");
     }
   } catch (error) {
     state.pairing.phase = "not_found";
-    state.pairing.message = "Home Assistant nicht erreichbar";
+    state.pairing.message = t("error.ha_unreachable");
   }
   render();
-}
-
-function infrastructureLabel(key) {
-  const labels = {
-    mqtt: "MQTT",
-    zigbee2mqtt: "Zigbee2MQTT",
-    zha: "ZHA",
-    matter: "Matter",
-    thread: "Thread",
-    hue: "Hue Bridge",
-  };
-  return labels[key] || key;
 }
 
 function renderInfrastructure() {
@@ -1310,13 +1113,13 @@ function renderInfrastructure() {
   const wrap = document.createElement("div");
   wrap.className = "infra-list";
   if (!state.connection) {
-    wrap.innerHTML = `<p class="empty-state">Wähle zuerst die Verbindungsart.</p>`;
+    wrap.innerHTML = `<p class="empty-state">${t("wizard.choose_connection_first")}</p>`;
     return wrap;
   }
 
   const source = document.createElement("div");
   source.className = "probe-source";
-  source.innerHTML = `<strong>Automatische Prüfung</strong><span>${tree.home_assistant_status?.source || "Home Assistant Status unbekannt"}</span>`;
+  source.innerHTML = `<strong>${t("wizard.auto_check")}</strong><span>${state.liveCapabilities ? t("status.source_live") : tree.home_assistant_status?.source || t("wizard.ha_status_unknown")}</span>`;
   wrap.appendChild(source);
 
   items.forEach((item) => {
@@ -1333,12 +1136,11 @@ function renderInfrastructure() {
       const question = document.createElement("div");
       question.className = "infra-question";
       question.innerHTML = `<p>${item.question}</p>`;
-      ["Ja", "Nein"].forEach((label) => {
-        const value = label === "Ja";
+      [true, false].forEach((value) => {
         const button = document.createElement("button");
         button.type = "button";
         button.className = state.infrastructureAnswers[item.id] === value ? "mini-choice active" : "mini-choice";
-        button.textContent = label;
+        button.textContent = value ? t("common.yes") : t("common.no");
         button.addEventListener("click", () => {
           state.infrastructureAnswers[item.id] = value;
           render();
@@ -1358,14 +1160,14 @@ function renderResult() {
   result.className = "result-grid";
 
   const profile = [
-    ["Geräteart", currentCategory().title],
-    ["Hersteller", state.manufacturer],
-    ["Modell", state.model],
-    ["Verbindung", state.connection],
+    [t("profile.category"), currentCategory().title],
+    [t("profile.manufacturer"), state.manufacturer],
+    [t("profile.model"), state.model],
+    [t("profile.connection"), state.connection && connectionLabel(state.connection)],
   ];
   if (state.selectedKnowledgeDevice) {
     profile.push([
-      "Knowledge-Kontext",
+      t("knowledge.context"),
       knowledgeDeviceLabel(state.selectedKnowledgeDevice),
     ]);
   }
@@ -1378,21 +1180,21 @@ function renderResult() {
     </div>
     <div class="result-card muted-card">
       <span class="result-icon">${icons.route}</span>
-      <h3>Entscheidungsprofil</h3>
+      <h3>${t("profile.title")}</h3>
       <dl>${profile
-        .map(([key, value]) => `<dt>${key}</dt><dd>${value || "Noch offen"}</dd>`)
+        .map(([key, value]) => `<dt>${key}</dt><dd>${value || t("profile.open")}</dd>`)
         .join("")}</dl>
     </div>
   `;
 
   const next = document.createElement("div");
   next.className = "next-steps";
-  next.innerHTML = `<h3>${ready ? "Nächste sinnvolle Schritte" : "Handlungsempfehlung"}</h3>`;
+  next.innerHTML = `<h3>${ready ? t("result.next_steps") : t("result.recommendation")}</h3>`;
   const list = document.createElement("ul");
   const items = ready
     ? [
         evaluation.action,
-        "Entitäten prüfen und Raum, Name sowie Dashboard-Zuordnung festlegen",
+        t("result.check_entities"),
       ]
     : [evaluation.action, ...(evaluation.items || []).filter((item) => item.status === "missing").map((item) => item.action)];
   items.forEach((item) => {
@@ -1405,7 +1207,7 @@ function renderResult() {
   if (evaluation.integrations?.length) {
     const integrations = document.createElement("div");
     integrations.className = "integration-list";
-    integrations.innerHTML = `<h3>Mögliche Integrationen</h3><p>${evaluation.integrations.join(", ")}</p>`;
+    integrations.innerHTML = `<h3>${t("result.possible_integrations")}</h3><p>${evaluation.integrations.join(", ")}</p>`;
     result.appendChild(integrations);
   }
 
@@ -1413,7 +1215,7 @@ function renderResult() {
   if (analysisChecks.length > 0) {
     const checks = document.createElement("div");
     checks.className = "check-summary analysis-summary";
-    checks.innerHTML = `<h3>Analyse</h3>`;
+    checks.innerHTML = `<h3>${t("result.analysis")}</h3>`;
     const checkList = document.createElement("ul");
     analysisChecks.forEach((item) => {
       const li = document.createElement("li");
@@ -1441,9 +1243,9 @@ function stateIcon(stateName) {
 }
 
 function stateText(stateName) {
-  if (stateName === "present" || stateName === "detected") return "vorhanden";
-  if (stateName === "missing") return "fehlt";
-  return "unklar";
+  if (stateName === "present" || stateName === "detected") return t("state.present");
+  if (stateName === "missing") return t("state.missing");
+  return t("state.unknown");
 }
 
 function canContinue() {
@@ -1496,14 +1298,14 @@ function renderQuestion() {
 
 function renderSummary() {
   const answers = [
-    ["Geräteart", currentCategory().title],
-    ["Hersteller", state.manufacturer || "Offen"],
-    ["Modell", state.model || "Offen"],
-    ["Verbindung", state.connection || "Offen"],
+    [t("profile.category"), currentCategory().title],
+    [t("profile.manufacturer"), state.manufacturer || t("profile.open_short")],
+    [t("profile.model"), state.model || t("profile.open_short")],
+    [t("profile.connection"), state.connection ? connectionLabel(state.connection) : t("profile.open_short")],
   ];
   if (state.selectedKnowledgeDevice) {
     answers.push([
-      "Knowledge-Kontext",
+      t("knowledge.context"),
       knowledgeDeviceLabel(state.selectedKnowledgeDevice),
     ]);
   }
@@ -1551,7 +1353,7 @@ function render() {
   categoryIcon.innerHTML = icons[category.icon] || "";
   questionTitle.textContent = step.title;
   questionBody.innerHTML = `${escapeHtml(step.body)}${renderKnowledgeContext()}`;
-  stepCounter.textContent = `Schritt ${currentStep + 1} von ${steps.length}`;
+  stepCounter.textContent = t("wizard.step_counter", { current: currentStep + 1, total: steps.length });
   progressLabel.textContent = `${percent}%`;
   progressBar.style.width = `${percent}%`;
 
@@ -1561,7 +1363,7 @@ function render() {
 
   prevBtn.disabled = currentStep === 0;
   nextBtn.disabled = !canContinue() || currentStep === steps.length - 1;
-  nextBtn.innerHTML = `Weiter <span class="button-icon">${icons["arrow-right"]}</span>`;
+  nextBtn.innerHTML = `${t("wizard.next")} <span class="button-icon">${icons["arrow-right"]}</span>`;
 }
 
 manualStartBtn.addEventListener("click", () => {

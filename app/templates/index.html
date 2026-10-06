@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="de">
+<html lang="{{ lang }}">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -11,66 +11,72 @@
       <main class="content">
         <section class="topbar">
           <div>
-            <a class="brand" href="/" aria-label="Smart Guide Start">
+            <a class="brand" href="/" aria-label="{{ t('page.brand_aria') }}">
               <span class="brand-mark">SG</span>
               <span>
                 <strong>Smart Guide</strong>
-                <small>Entscheidungsassistent</small>
+                <small>{{ t("page.brand_subtitle") }}</small>
               </span>
             </a>
-            <p class="eyebrow">Home Assistant Orientierung</p>
-            <h1>Smarthome-Geräteeinbindung</h1>
+            <p class="eyebrow">{{ t("page.eyebrow") }}</p>
+            <h1>{{ t("page.headline") }}</h1>
           </div>
-          <div class="status-pill">
-            <span class="pulse"></span>
-            Analyse bereit
+          <div class="topbar-side">
+            <nav class="lang-switch" aria-label="{{ t('page.language') }}">
+              <a href="?lang=en"{% if lang == "en" %} aria-current="true"{% endif %}>EN</a>
+              <a href="?lang=de"{% if lang == "de" %} aria-current="true"{% endif %}>DE</a>
+            </nav>
+            <div class="status-pill">
+              <span class="pulse"></span>
+              {{ t("page.status_ready") }}
+            </div>
           </div>
         </section>
 
         <section class="dashboard">
           <section class="analysis-panel" id="haAnalysisPanel" aria-live="polite">
             <div>
-              <p class="eyebrow">Systemstatus</p>
-              <h2>Home Assistant Analyse</h2>
+              <p class="eyebrow">{{ t("page.system_status") }}</p>
+              <h2>{{ t("page.ha_analysis") }}</h2>
             </div>
             <div class="analysis-state" id="haAnalysisState">
               <span class="analysis-spinner"></span>
-              <strong>Analyse läuft...</strong>
+              <strong>{{ t("analysis.running") }}</strong>
             </div>
           </section>
 
-          <section class="start-panel" id="startPanel" aria-label="Startauswahl">
+          <section class="start-panel" id="startPanel" aria-label="{{ t('start.aria') }}">
             <button class="start-card" type="button" id="manualStartBtn">
               <span class="start-icon" data-icon="route"></span>
               <span>
-                <strong>Gerät manuell eingeben</strong>
-                <small>Hersteller, Modell und Verbindung Schritt für Schritt auswählen.</small>
-                <em>Manuell starten</em>
+                <strong>{{ t("start.manual_title") }}</strong>
+                <small>{{ t("start.manual_body") }}</small>
+                <em>{{ t("start.manual_cta") }}</em>
               </span>
             </button>
 
             <button class="start-card disabled" type="button" disabled aria-disabled="true">
               <span class="start-icon" data-icon="qr"></span>
               <span>
-                <strong>QR-Code einlesen</strong>
-                <small>Gerät per QR-Code oder Produktcode erkennen.</small>
-                <em>Demnächst verfügbar</em>
+                <strong>{{ t("start.qr_title") }}</strong>
+                <small>{{ t("start.qr_body") }}</small>
+                <em>{{ t("start.coming_soon") }}</em>
               </span>
             </button>
           </section>
 
-          <section class="knowledge-panel" id="knowledgePanel" aria-label="Gerätesuche">
+          <section class="knowledge-panel" id="knowledgePanel" aria-label="{{ t('search.aria') }}">
             <div class="knowledge-head">
               <div>
-                <p class="eyebrow">Knowledge-Datenbank</p>
-                <h2>Gerät suchen</h2>
-                <p>Suche nach Hersteller, Modellnummer oder technischer Kennung aus Zigbee2MQTT.</p>
+                <p class="eyebrow">{{ t("search.eyebrow") }}</p>
+                <h2>{{ t("search.title") }}</h2>
+                <p>{{ t("search.body") }}</p>
               </div>
               <form class="device-search" id="deviceSearchForm">
-                <label for="deviceSearchInput">Suchbegriff</label>
+                <label for="deviceSearchInput">{{ t("search.label") }}</label>
                 <div>
-                  <input id="deviceSearchInput" type="search" autocomplete="off" placeholder="z. B. TS011F" />
-                  <button class="primary" type="submit">Suchen</button>
+                  <input id="deviceSearchInput" type="search" autocomplete="off" placeholder="{{ t('search.placeholder') }}" />
+                  <button class="primary" type="submit">{{ t("search.submit") }}</button>
                 </div>
               </form>
             </div>
@@ -88,7 +94,7 @@
               </div>
             </div>
 
-            <div class="progress-wrap" aria-label="Fortschritt">
+            <div class="progress-wrap" aria-label="{{ t('wizard.progress_aria') }}">
               <div class="progress-meta">
                 <span id="stepCounter"></span>
                 <span id="progressLabel"></span>
@@ -103,21 +109,21 @@
             <div class="wizard-actions">
               <button class="secondary" type="button" id="prevBtn">
                 <span class="button-icon" data-icon="arrow-left"></span>
-                Zurück
+                {{ t("wizard.back") }}
               </button>
               <button class="secondary" type="button" id="resetBtn">
                 <span class="button-icon" data-icon="refresh"></span>
-                Neu starten
+                {{ t("wizard.restart") }}
               </button>
               <button class="primary" type="button" id="nextBtn">
-                Weiter
+                {{ t("wizard.next") }}
                 <span class="button-icon" data-icon="arrow-right"></span>
               </button>
             </div>
           </div>
 
           <aside class="summary-panel">
-            <p class="eyebrow">Entscheidungsprofil</p>
+            <p class="eyebrow">{{ t("profile.title") }}</p>
             <dl class="answer-list" id="answerList"></dl>
             <ol class="step-list" id="stepList"></ol>
           </aside>
@@ -126,6 +132,7 @@
     </div>
 
     <script id="treeData" type="application/json">{{ tree | tojson }}</script>
+    <script id="i18nData" type="application/json">{{ i18n | tojson }}</script>
     <script src="{{ url_for('static', path='app.js') }}?v={{ app_version }}"></script>
   </body>
 </html>

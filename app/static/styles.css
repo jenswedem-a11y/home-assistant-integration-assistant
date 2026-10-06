@@ -119,6 +119,37 @@ h1 {
   white-space: nowrap;
 }
 
+.topbar-side {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lang-switch {
+  display: inline-flex;
+  min-height: 38px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+}
+
+.lang-switch a {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 12px;
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.lang-switch a[aria-current="true"] {
+  background: var(--ha-blue);
+  color: #ffffff;
+}
+
 .pulse {
   width: 9px;
   height: 9px;

@@ -1,15 +1,16 @@
 import json
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 
 from app.database import DatabaseConfigError, get_connection
+from app.i18n import resolve_language, t
 
 router = APIRouter()
 
 
-def error_response(message: str) -> dict[str, Any]:
-    return {"ok": False, "error": message}
+def catalog_error(request: Request, exc: DatabaseConfigError) -> dict[str, Any]:
+    return {"ok": False, "error": t(resolve_language(request), "error.catalog_missing", path=str(exc))}
 
 
 def query_all(sql: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
@@ -78,7 +79,7 @@ def health() -> dict[str, bool]:
 
 
 @router.get("/devices/search")
-def search_devices(q: str = "") -> dict[str, Any]:
+def search_devices(request: Request, q: str = "") -> dict[str, Any]:
     query = q.strip()
     if not query:
         return {"ok": True, "query": q, "items": []}
@@ -115,7 +116,7 @@ def search_devices(q: str = "") -> dict[str, Any]:
             (pattern, pattern, pattern, pattern, pattern, pattern, pattern),
         )
     except DatabaseConfigError as exc:
-        return error_response(str(exc))
+        return catalog_error(request, exc)
 
     items = []
     for row in rows:
@@ -137,7 +138,7 @@ def search_devices(q: str = "") -> dict[str, Any]:
 
 
 @router.get("/devices/by-vendor")
-def get_devices_by_vendor(vendor: str = "") -> dict[str, Any]:
+def get_devices_by_vendor(request: Request, vendor: str = "") -> dict[str, Any]:
     selected_vendor = vendor.strip()
     if not selected_vendor:
         return {"ok": True, "vendor": vendor, "items": []}
@@ -160,17 +161,17 @@ def get_devices_by_vendor(vendor: str = "") -> dict[str, Any]:
             (selected_vendor,),
         )
     except DatabaseConfigError as exc:
-        return error_response(str(exc))
+        return catalog_error(request, exc)
 
     return {"ok": True, "vendor": vendor, "items": items}
 
 
 @router.get("/devices/{device_id}")
-def get_device(device_id: int) -> dict[str, Any]:
+def get_device(request: Request, device_id: int) -> dict[str, Any]:
     try:
         device = query_one("SELECT * FROM devices WHERE id = ?", (device_id,))
         if not device:
-            return {"ok": False, "error": "Gerät nicht gefunden."}
+            return {"ok": False, "error": t(resolve_language(request), "device.not_found")}
 
         variants = query_all(
             "SELECT * FROM device_variants WHERE device_id = ? ORDER BY id",
@@ -209,7 +210,7 @@ def get_device(device_id: int) -> dict[str, Any]:
             "raw_data",
         )
     except DatabaseConfigError as exc:
-        return error_response(str(exc))
+        return catalog_error(request, exc)
 
     return {
         "ok": True,
@@ -223,7 +224,7 @@ def get_device(device_id: int) -> dict[str, Any]:
 
 
 @router.get("/vendors")
-def get_vendors() -> dict[str, Any]:
+def get_vendors(request: Request) -> dict[str, Any]:
     try:
         items = query_all(
             """
@@ -234,6 +235,6 @@ def get_vendors() -> dict[str, Any]:
             """
         )
     except DatabaseConfigError as exc:
-        return error_response(str(exc))
+        return catalog_error(request, exc)
 
     return {"ok": True, "items": items}

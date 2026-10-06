@@ -12,6 +12,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from app.i18n import LANGUAGE_COOKIE, normalize_language, resolve_language, strings, t, tn
 from app.search import router as search_router
 
 APP_VERSION = "0.8.0"
@@ -80,110 +81,6 @@ DEFAULT_HA_STATUS = {
 }
 
 
-DEVICE_DATABASE = [
-    {
-        "manufacturer": "Philips Hue",
-        "model": "Hue White",
-        "category": "licht",
-        "connection": "Hersteller-Bridge",
-        "required_infrastructure": ["hue"],
-        "possible_integrations": ["Philips Hue"],
-        "compatibility_status": "supported",
-    },
-    {
-        "manufacturer": "Philips Hue",
-        "model": "Hue White",
-        "category": "licht",
-        "connection": "Zigbee",
-        "required_infrastructure": ["zha"],
-        "possible_integrations": ["ZHA", "Zigbee2MQTT"],
-        "compatibility_status": "supported",
-    },
-    {
-        "manufacturer": "Aqara",
-        "model": "Temperatur/Luftfeuchte",
-        "category": "sensor",
-        "connection": "Zigbee",
-        "required_infrastructure": ["zha"],
-        "possible_integrations": ["ZHA", "Zigbee2MQTT"],
-        "compatibility_status": "supported",
-    },
-    {
-        "manufacturer": "Aqara",
-        "model": "Thermostat E1",
-        "category": "heizung",
-        "connection": "Zigbee",
-        "required_infrastructure": ["zigbee2mqtt", "mqtt"],
-        "possible_integrations": ["Zigbee2MQTT"],
-        "compatibility_status": "supported",
-    },
-    {
-        "manufacturer": "IKEA Tradfri",
-        "model": "Tradfri Steckdose",
-        "category": "steckdose",
-        "connection": "Zigbee",
-        "required_infrastructure": ["zha"],
-        "possible_integrations": ["ZHA", "Zigbee2MQTT"],
-        "compatibility_status": "supported",
-    },
-    {
-        "manufacturer": "Shelly",
-        "model": "Shelly Plug S",
-        "category": "steckdose",
-        "connection": "WLAN",
-        "required_infrastructure": [],
-        "possible_integrations": ["Shelly"],
-        "compatibility_status": "supported",
-    },
-    {
-        "manufacturer": "Samsung",
-        "model": "Tizen TV",
-        "category": "fernseher",
-        "connection": "WLAN",
-        "required_infrastructure": [],
-        "possible_integrations": ["Samsung Smart TV"],
-        "compatibility_status": "supported",
-    },
-    {
-        "manufacturer": "Tuya",
-        "model": "Matter Gerät",
-        "category": "sensor",
-        "connection": "Matter",
-        "required_infrastructure": ["matter"],
-        "possible_integrations": ["Matter"],
-        "compatibility_status": "supported",
-    },
-    {
-        "manufacturer": "Tuya",
-        "model": "Bluetooth Gerät",
-        "category": "sensor",
-        "connection": "Bluetooth",
-        "required_infrastructure": [],
-        "possible_integrations": [],
-        "compatibility_status": "unclear",
-    },
-    {
-        "manufacturer": "Homematic IP",
-        "model": "Heizkörperthermostat",
-        "category": "heizung",
-        "connection": "Hersteller-Bridge",
-        "required_infrastructure": [],
-        "possible_integrations": ["HomematicIP Cloud", "Homematic"],
-        "compatibility_status": "supported",
-    },
-]
-
-
-INFRA_LABELS = {
-    "mqtt": "MQTT",
-    "zigbee2mqtt": "Zigbee2MQTT",
-    "zha": "ZHA",
-    "matter": "Matter",
-    "thread": "Thread",
-    "hue": "Hue Bridge",
-}
-
-
 def has_any_term(value, terms):
     text = str(value or "").lower()
     return any(term in text for term in terms)
@@ -246,11 +143,11 @@ def scan_home_assistant_states(states, infrastructure=None):
         "matter": "unknown",
         "thread": "unknown",
         "groups": {
-            "lights": {"label": "Lichter", "entities": []},
-            "televisions": {"label": "Fernseher", "entities": []},
-            "sensors": {"label": "Sensoren", "entities": []},
-            "voice_assistants": {"label": "Sprachassistenten", "entities": []},
-            "mobile_devices": {"label": "Mobilgeräte", "entities": []},
+            "lights": {"entities": []},
+            "televisions": {"entities": []},
+            "sensors": {"entities": []},
+            "voice_assistants": {"entities": []},
+            "mobile_devices": {"entities": []},
         },
     }
 
@@ -319,7 +216,7 @@ def scan_home_assistant_states(states, infrastructure=None):
             "name": friendly_name or entity_id,
             "entity_id": entity_id,
             "status": entity.get("state", "unknown"),
-            "area": attributes.get("area_name") or attributes.get("area_id") or "Unbekannt",
+            "area": attributes.get("area_name") or attributes.get("area_id"),
         }
 
         lower_id = entity_id.lower()
@@ -424,6 +321,14 @@ def normalize_echo_name(name):
         " Nächste Erinnerung",
         " Nächster Timer",
         " Bitte nicht stören",
+        " Connectivity",
+        " Speak",
+        " Announce",
+        " Illuminance",
+        " Next alarm",
+        " Next reminder",
+        " Next timer",
+        " Do not disturb",
     ]
     for suffix in suffixes:
         if text.endswith(suffix):
@@ -450,13 +355,13 @@ def dedupe_translator_devices(translator):
 def build_capabilities(translator):
     caps = []
     if translator["real_devices"]["lights"]:
-        caps.append("Lichtsteuerung")
+        caps.append("light_control")
     if translator["real_devices"]["tvs"]:
-        caps.append("Fernseher / Mediensteuerung")
+        caps.append("media_control")
     if translator["integrations"]["alexa"]:
-        caps.append("Alexa Sprachsteuerung")
+        caps.append("alexa_voice")
     if translator["real_devices"]["mobile_devices"]:
-        caps.append("Smartphone-Anwesenheit")
+        caps.append("phone_presence")
     translator["capabilities"] = caps
 
 
@@ -521,25 +426,25 @@ def call_home_assistant_service(base_url, token, domain, service, data=None):
         return json.loads(response.read().decode("utf-8"))
 
 
-def fetch_home_assistant_analysis():
+def fetch_home_assistant_analysis(lang):
     base_url = (os.environ.get("HOME_ASSISTANT_URL") or RUNTIME_HOME_ASSISTANT_URL or "").rstrip("/")
     token = os.environ.get("HOME_ASSISTANT_TOKEN") or RUNTIME_HOME_ASSISTANT_TOKEN
 
     if not base_url:
-        return {"ok": False, "error": "Home Assistant nicht verbunden", "needs_connection": True, "analysis": None}
+        return {"ok": False, "error": t(lang, "error.ha_not_connected"), "needs_connection": True, "analysis": None}
 
     if not token:
-        return {"ok": False, "error": "Home Assistant Token fehlt", "needs_connection": True, "analysis": None}
+        return {"ok": False, "error": t(lang, "error.ha_token_missing"), "needs_connection": True, "analysis": None}
 
     try:
         states = fetch_home_assistant_states(base_url, token)
         services = fetch_home_assistant_services(base_url, token)
     except urllib.error.HTTPError as exc:
         if exc.code == 401:
-            return {"ok": False, "error": "Token ungültig oder abgelaufen", "needs_connection": True, "analysis": None}
-        return {"ok": False, "error": "Home Assistant nicht erreichbar", "needs_connection": False, "analysis": None}
+            return {"ok": False, "error": t(lang, "error.ha_token_invalid"), "needs_connection": True, "analysis": None}
+        return {"ok": False, "error": t(lang, "error.ha_unreachable"), "needs_connection": False, "analysis": None}
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError):
-        return {"ok": False, "error": "Home Assistant nicht erreichbar", "needs_connection": False, "analysis": None}
+        return {"ok": False, "error": t(lang, "error.ha_unreachable"), "needs_connection": False, "analysis": None}
 
     infrastructure = detect_infrastructure(states, services)
     analysis = scan_home_assistant_states(states, infrastructure)
@@ -553,7 +458,7 @@ def fetch_home_assistant_analysis():
     }
 
 
-def test_home_assistant_connection(base_url, token):
+def test_home_assistant_connection(base_url, token, lang):
     request = urllib.request.Request(
         f"{base_url.rstrip('/')}/api/",
         headers={
@@ -568,10 +473,10 @@ def test_home_assistant_connection(base_url, token):
         return {"ok": True, "error": None}
     except urllib.error.HTTPError as exc:
         if exc.code == 401:
-            return {"ok": False, "error": "Token ungültig oder abgelaufen"}
-        return {"ok": False, "error": "Home Assistant nicht erreichbar"}
+            return {"ok": False, "error": t(lang, "error.ha_token_invalid")}
+        return {"ok": False, "error": t(lang, "error.ha_unreachable")}
     except (urllib.error.URLError, TimeoutError):
-        return {"ok": False, "error": "Home Assistant nicht erreichbar"}
+        return {"ok": False, "error": t(lang, "error.ha_unreachable")}
 
 
 def configured_home_assistant():
@@ -587,423 +492,151 @@ def home_assistant_devices_url():
     return f"{base_url.rstrip('/')}/config/devices/dashboard"
 
 
-def home_assistant_action_ready():
+def home_assistant_action_ready(lang):
     url, token = configured_home_assistant()
     if not url:
-        return False, "Home Assistant nicht verbunden"
+        return False, t(lang, "error.ha_not_connected")
     if not token:
-        return False, "Home Assistant Token fehlt"
+        return False, t(lang, "error.ha_token_missing")
     return True, None
 
 
-def find_device(category: str, manufacturer: str, model: str, connection: str):
-    exact = [
-        device
-        for device in DEVICE_DATABASE
-        if device["category"] == category
-        and device["manufacturer"] == manufacturer
-        and device["model"] == model
-        and device["connection"] == connection
-    ]
-    if exact:
-        return exact[0]
+CATEGORIES = [
+    {"id": "light", "icon": "lightbulb", "accent": "#f6b73c"},
+    {"id": "tv", "icon": "tv", "accent": "#55c0f0"},
+    {"id": "sensor", "icon": "gauge", "accent": "#ff7f66"},
+    {"id": "plug", "icon": "plug", "accent": "#41b883"},
+    {"id": "heating", "icon": "thermostat", "accent": "#d97745"},
+]
 
-    compatible_model = [
-        device
-        for device in DEVICE_DATABASE
-        if device["category"] == category
-        and device["manufacturer"] == manufacturer
-        and device["model"] == model
-    ]
-    if compatible_model:
-        return {"known_device": compatible_model[0], "connection_mismatch": True}
+CONNECTIONS = ["wifi", "zigbee", "matter", "bluetooth", "lan", "bridge"]
 
-    manufacturer_match = [
-        device
-        for device in DEVICE_DATABASE
-        if device["category"] == category and device["manufacturer"] == manufacturer
-    ]
-    if manufacturer_match:
-        return {"known_device": manufacturer_match[0], "unknown_model": True}
+# Requirement checks per connection: (check id, capability probed from Home Assistant).
+# Labels, questions and actions live in app/locales as infra.<connection>.<check id>.*
+INFRASTRUCTURE = {
+    "wifi": [
+        ("same_network", "network_devices"),
+        ("local_integration", "integrations"),
+        ("cloud_dependency", "cloud_dependency"),
+    ],
+    "zigbee": [
+        ("zigbee_stack", "zigbee_stack"),
+        ("zigbee_coordinator", "zigbee_coordinator"),
+        ("mqtt", "mqtt"),
+    ],
+    "matter": [
+        ("matter_server", "matter"),
+        ("thread_router", "thread"),
+        ("same_network", "network_devices"),
+    ],
+    "bluetooth": [
+        ("bluetooth_adapter", "bluetooth"),
+        ("bluetooth_range", "bluetooth_range"),
+        ("bluetooth_integration", "bluetooth_integration"),
+    ],
+    "lan": [
+        ("known_ip", "network_devices"),
+        ("local_control", "local_api"),
+        ("firewall", "firewall"),
+    ],
+    "bridge": [
+        ("bridge_reachable", "bridge"),
+        ("bridge_paired", "bridge_devices"),
+        ("bridge_integration", "integrations"),
+    ],
+}
 
-    return None
 
-
-def compatibility_check(category: str, manufacturer: str, model: str, connection: str, ha_status: dict | None = None):
-    ha_status = ha_status or DEFAULT_HA_STATUS
-    match = find_device(category, manufacturer, model, connection)
-    if not match:
-        return {
-            "status": "unclear",
-            "title": "Gerät nicht in der Datenbank",
-            "reason": "Für diese Kombination aus Hersteller, Modell und Verbindung liegen noch keine belastbaren Daten vor.",
-            "next_step": "Hersteller, Modellnummer und Funkstandard prüfen oder das Gerät manuell als neues Datenbankprofil ergänzen.",
-            "device": None,
-            "checks": [
-                {"label": "Gerätedatenbank", "state": "unknown", "detail": "Kein passender Eintrag gefunden."}
-            ],
-            "missing": [],
-            "possible_integrations": [],
-        }
-
-    if isinstance(match, dict) and match.get("connection_mismatch"):
-        device = match["known_device"]
-        return {
-            "status": "not_compatible",
-            "title": "Verbindungstyp wird nicht unterstützt",
-            "reason": f"{manufacturer} {model} ist bekannt, aber nicht mit {connection} in der Datenbank hinterlegt.",
-            "next_step": f"Wähle einen bekannten Verbindungstyp für dieses Gerät, zum Beispiel {device['connection']}.",
-            "device": device,
-            "checks": [
-                {"label": "Gerät bekannt", "state": "present", "detail": f"{manufacturer} {model}"},
-                {"label": "Verbindung", "state": "missing", "detail": f"{connection} nicht unterstützt."},
-            ],
-            "missing": [],
-            "possible_integrations": device["possible_integrations"],
-        }
-
-    if isinstance(match, dict) and match.get("unknown_model"):
-        device = match["known_device"]
-        return {
-            "status": "unclear",
-            "title": "Modell noch nicht eindeutig bekannt",
-            "reason": f"{manufacturer} ist bekannt, aber das Modell {model} ist noch nicht sicher bewertet.",
-            "next_step": "Modellnummer prüfen und mit der Gerätedatenbank abgleichen.",
-            "device": None,
-            "checks": [
-                {"label": "Hersteller", "state": "present", "detail": manufacturer},
-                {"label": "Modell", "state": "unknown", "detail": model},
-            ],
-            "missing": [],
-            "possible_integrations": device["possible_integrations"],
-        }
-
-    device = match
-    if device["compatibility_status"] == "not_supported":
-        return {
-            "status": "not_compatible",
-            "title": "Gerät aktuell nicht integrierbar",
-            "reason": "Die Gerätedatenbank markiert dieses Gerät aktuell als nicht kompatibel.",
-            "next_step": "Alternative Verbindung oder anderes Gerät wählen.",
-            "device": device,
-            "checks": [
-                {"label": "Kompatibilität", "state": "missing", "detail": "Nicht kompatibel."}
-            ],
-            "missing": [],
-            "possible_integrations": device["possible_integrations"],
-        }
-
-    if device["compatibility_status"] == "unclear":
-        return {
-            "status": "unclear",
-            "title": "Kompatibilität unklar",
-            "reason": "Die Datenbank kennt das Gerät, bewertet die Integration aber noch nicht sicher.",
-            "next_step": "Offizielle Home-Assistant-Integration und Community-Berichte prüfen.",
-            "device": device,
-            "checks": [
-                {"label": "Kompatibilität", "state": "unknown", "detail": "Noch nicht verifiziert."}
-            ],
-            "missing": [],
-            "possible_integrations": device["possible_integrations"],
-        }
-
-    checks = []
-    missing = []
-    for infra in device["required_infrastructure"]:
-        present = ha_status.get(infra)
-        state = "present" if present else "missing"
-        checks.append(
-            {
-                "label": INFRA_LABELS.get(infra, infra),
-                "state": state,
-                "detail": "vorhanden" if present else "fehlt",
-            }
-        )
-        if not present:
-            missing.append(infra)
-
-    if not checks:
-        checks.append(
-            {
-                "label": "Zusätzliche Infrastruktur",
-                "state": "present",
-                "detail": "Keine zusätzliche Infrastruktur erforderlich.",
-            }
-        )
-
-    if missing:
-        labels = [INFRA_LABELS.get(item, item) for item in missing]
-        return {
-            "status": "missing_requirements",
-            "title": "Voraussetzungen fehlen",
-            "reason": f"Für diesen Integrationsweg fehlen: {', '.join(labels)}.",
-            "next_step": f"Richte zuerst {labels[0]} ein und starte die Analyse danach erneut.",
-            "device": device,
-            "checks": checks,
-            "missing": missing,
-            "possible_integrations": device["possible_integrations"],
-        }
-
+def offline_home_assistant_status(lang):
     return {
-        "status": "integratable",
-        "title": "Gerät integrierbar",
-        "reason": "Die benötigte Infrastruktur ist laut Analyse vorhanden.",
-        "next_step": f"Nutze die Integration {device['possible_integrations'][0]} und starte danach die konkrete Geräteeinbindung.",
-        "device": device,
-        "checks": checks,
-        "missing": [],
-        "possible_integrations": device["possible_integrations"],
+        "source": t(lang, "status.source_none"),
+        "capabilities": build_capability_map(DEFAULT_HA_STATUS, connected=False),
     }
 
 
-DECISION_TREE = {
-    "categories": [
-        {"id": "licht", "title": "Licht", "icon": "lightbulb", "accent": "#f6b73c"},
-        {"id": "fernseher", "title": "Fernseher", "icon": "tv", "accent": "#55c0f0"},
-        {"id": "sensor", "title": "Sensor", "icon": "gauge", "accent": "#ff7f66"},
-        {"id": "steckdose", "title": "Steckdose", "icon": "plug", "accent": "#41b883"},
-        {"id": "heizung", "title": "Heizung", "icon": "thermostat", "accent": "#d97745"},
-    ],
-    "manufacturers": {
-        "licht": ["Philips Hue", "IKEA Tradfri", "Aqara", "Shelly", "Tuya", "Sonstiger"],
-        "fernseher": ["Samsung", "LG", "Sony", "Philips", "Android TV", "Sonstiger"],
-        "sensor": ["Aqara", "Sonoff", "Shelly", "IKEA", "Tuya", "Sonstiger"],
-        "steckdose": ["Shelly", "Sonoff", "Aqara", "IKEA", "Tuya", "Sonstiger"],
-        "heizung": ["tado", "Homematic IP", "Bosch", "Aqara", "Tuya", "Sonstiger"],
-    },
-    "models": {
-        "Philips Hue": ["Hue White", "Hue Ambiance", "Hue Lightstrip", "Hue Dimmer Switch", "Anderes Hue Modell"],
-        "IKEA Tradfri": ["Tradfri Lampe", "Tradfri Steckdose", "Tradfri Fernbedienung", "Vallhorn Sensor"],
-        "Aqara": ["Temperatur/Luftfeuchte", "Tür/Fenster Sensor", "Bewegungssensor", "Smart Plug", "Thermostat E1"],
-        "Shelly": ["Shelly Plus 1", "Shelly Plug S", "Shelly Dimmer", "Shelly BLU Sensor", "Shelly TRV"],
-        "Tuya": ["WLAN Gerät", "Zigbee Gerät", "Bluetooth Gerät", "Matter Gerät"],
-        "Samsung": ["Tizen TV", "The Frame", "QLED", "Anderes Samsung Modell"],
-        "LG": ["webOS TV", "OLED", "NanoCell", "Anderes LG Modell"],
-        "Sony": ["Android TV", "Google TV", "Bravia", "Anderes Sony Modell"],
-        "Philips": ["Android TV", "Saphi TV", "Hue Sync Gerät", "Anderes Philips Modell"],
-        "Android TV": ["Android TV", "Google TV", "Chromecast", "Nvidia Shield"],
-        "Sonoff": ["SNZB Sensor", "ZBMINI", "S26/S40 Plug", "POW", "THR"],
-        "tado": ["Smart Thermostat", "Smart Radiator Thermostat", "Bridge X", "V3+ Bridge"],
-        "Homematic IP": ["Heizkörperthermostat", "Wandthermostat", "Access Point Gerät"],
-        "Bosch": ["Smart Home Thermostat", "Raumthermostat", "Controller II Gerät"],
-        "Sonstiger": ["Modell bekannt", "Modell unbekannt"],
-    },
-    "connections": ["WLAN", "Zigbee", "Matter", "Bluetooth", "LAN", "Hersteller-Bridge"],
-    "infrastructure": {
-        "WLAN": [
-            {
-                "id": "same_network",
-                "label": "Gerät ist im gleichen Netzwerk wie Home Assistant",
-                "capability": "network_devices",
-                "question": "Ist das Gerät im gleichen Netzwerk wie Home Assistant erreichbar?",
-                "action": "Verbinde das Gerät mit dem gleichen WLAN/LAN oder prüfe VLAN- und Firewall-Regeln.",
-            },
-            {
-                "id": "local_integration",
-                "label": "Home Assistant Integration oder lokale API ist verfügbar",
-                "capability": "integrations",
-                "question": "Existiert für Hersteller oder Gerät eine Home Assistant Integration?",
-                "action": "Prüfe zuerst Geräte & Dienste in Home Assistant und danach die offizielle Integrationsliste.",
-            },
-            {
-                "id": "cloud_dependency",
-                "label": "Cloud-Zwang wurde geprüft",
-                "capability": "cloud_dependency",
-                "question": "Kann das Gerät lokal gesteuert werden oder benötigt es eine Hersteller-Cloud?",
-                "action": "Wenn nur Cloud-Steuerung möglich ist, markiere den Pfad als cloudabhängig oder wähle ein lokal integrierbares Gerät.",
-            },
-        ],
-        "Zigbee": [
-            {
-                "id": "zigbee_stack",
-                "label": "Zigbee2MQTT oder ZHA ist installiert",
-                "capability": "zigbee_stack",
-                "question": "Ist ZHA oder Zigbee2MQTT in Home Assistant vorhanden?",
-                "action": "Installiere ZHA oder Zigbee2MQTT, bevor ein Zigbee-Gerät eingebunden werden kann.",
-            },
-            {
-                "id": "zigbee_coordinator",
-                "label": "Zigbee Coordinator ist verbunden",
-                "capability": "zigbee_coordinator",
-                "question": "Ist ein Zigbee Coordinator angeschlossen und online?",
-                "action": "Zusätzliche Hardware erforderlich: Zigbee Coordinator anschließen und in Home Assistant einrichten.",
-            },
-            {
-                "id": "mqtt",
-                "label": "Bei Zigbee2MQTT ist MQTT konfiguriert",
-                "capability": "mqtt",
-                "question": "Ist MQTT für Zigbee2MQTT konfiguriert?",
-                "action": "MQTT Broker installieren oder konfigurieren, wenn Zigbee2MQTT verwendet werden soll.",
-            },
-        ],
-        "Matter": [
-            {
-                "id": "matter_server",
-                "label": "Matter Server Add-on oder Integration ist vorhanden",
-                "capability": "matter",
-                "question": "Ist Matter in Home Assistant eingerichtet?",
-                "action": "Matter Server Add-on oder Matter Integration einrichten.",
-            },
-            {
-                "id": "thread_router",
-                "label": "Thread Border Router ist bei Thread-Geräten verfügbar",
-                "capability": "thread",
-                "question": "Ist für Thread-Geräte ein Thread Border Router vorhanden?",
-                "action": "Zusätzliche Hardware erforderlich, falls das Matter-Gerät Thread statt WLAN nutzt.",
-            },
-            {
-                "id": "same_network",
-                "label": "Gerät und Home Assistant sind im gleichen Netzwerk",
-                "capability": "network_devices",
-                "question": "Sind Gerät und Home Assistant im gleichen Netzwerk erreichbar?",
-                "action": "Netzwerk, VLAN, mDNS und Firewall prüfen.",
-            },
-        ],
-        "Bluetooth": [
-            {
-                "id": "bluetooth_adapter",
-                "label": "Bluetooth Adapter oder Proxy ist verfügbar",
-                "capability": "bluetooth",
-                "question": "Ist Bluetooth oder ein Bluetooth Proxy in Home Assistant verfügbar?",
-                "action": "Bluetooth Adapter aktivieren oder ESPHome Bluetooth Proxy bereitstellen.",
-            },
-            {
-                "id": "bluetooth_range",
-                "label": "Reichweite zum Gerät ist ausreichend",
-                "capability": "bluetooth_range",
-                "question": "Ist das Gerät zuverlässig in Bluetooth-Reichweite?",
-                "action": "Bluetooth Proxy näher am Gerät platzieren oder auf Zigbee/Matter/WLAN ausweichen.",
-            },
-            {
-                "id": "bluetooth_integration",
-                "label": "Home Assistant Bluetooth Integration ist aktiv",
-                "capability": "bluetooth_integration",
-                "question": "Ist die Bluetooth Integration aktiv?",
-                "action": "Bluetooth Integration in Home Assistant aktivieren.",
-            },
-        ],
-        "LAN": [
-            {
-                "id": "known_ip",
-                "label": "Gerät hat eine feste oder auffindbare IP-Adresse",
-                "capability": "network_devices",
-                "question": "Ist die IP-Adresse oder Netzwerkerkennung des Geräts bekannt?",
-                "action": "Im Router nachsehen, feste IP vergeben oder Netzwerkerkennung prüfen.",
-            },
-            {
-                "id": "local_control",
-                "label": "Lokale Steuerung ist aktiviert",
-                "capability": "local_api",
-                "question": "Ist lokale Steuerung oder eine lokale API aktiviert?",
-                "action": "Lokale Steuerung in der Hersteller-App oder Geräteoberfläche aktivieren.",
-            },
-            {
-                "id": "firewall",
-                "label": "Firewall blockiert Home Assistant nicht",
-                "capability": "firewall",
-                "question": "Kann Home Assistant das Gerät im Netzwerk erreichen?",
-                "action": "Firewall-, VLAN- und mDNS-Regeln prüfen.",
-            },
-        ],
-        "Hersteller-Bridge": [
-            {
-                "id": "bridge_reachable",
-                "label": "Bridge ist im Netzwerk erreichbar",
-                "capability": "bridge",
-                "question": "Ist die Hersteller-Bridge im Netzwerk erreichbar?",
-                "action": "Bridge einschalten, Netzwerk prüfen und ggf. feste IP vergeben.",
-            },
-            {
-                "id": "bridge_paired",
-                "label": "Bridge ist bereits mit dem Gerät gekoppelt",
-                "capability": "bridge_devices",
-                "question": "Ist das Gerät bereits mit der Bridge gekoppelt?",
-                "action": "Gerät zuerst in der Hersteller-Bridge koppeln.",
-            },
-            {
-                "id": "bridge_integration",
-                "label": "Passende Home Assistant Integration ist installiert",
-                "capability": "integrations",
-                "question": "Ist die passende Bridge-Integration in Home Assistant vorhanden?",
-                "action": "Bridge-Integration in Home Assistant einrichten, danach werden Geräte sichtbar.",
-            },
-        ],
-    },
-    "ha_status": DEFAULT_HA_STATUS,
-    "device_database": DEVICE_DATABASE,
-    "home_assistant_status": {
-        "source": "Noch keine Home-Assistant-Verbindung",
-        "capabilities": build_capability_map(DEFAULT_HA_STATUS, connected=False),
-    },
-    "compatibility": {
-        "Aqara": ["Zigbee", "Matter", "Hersteller-Bridge"],
-        "IKEA Tradfri": ["Zigbee", "Matter", "Hersteller-Bridge"],
-        "Philips Hue": ["Zigbee", "Matter", "Hersteller-Bridge"],
-        "Shelly": ["WLAN", "LAN", "Bluetooth"],
-        "Sonoff": ["WLAN", "Zigbee", "LAN"],
-        "Samsung": ["WLAN", "LAN"],
-        "LG": ["WLAN", "LAN"],
-        "Sony": ["WLAN", "LAN"],
-        "Android TV": ["WLAN", "LAN"],
-        "tado": ["WLAN", "Hersteller-Bridge", "Matter"],
-        "Homematic IP": ["Hersteller-Bridge"],
-        "Bosch": ["Hersteller-Bridge"],
-    },
-    "recommendations": {
-        "WLAN": "Prüfe zuerst, ob Home Assistant das Gerät lokal erkennen kann. Wenn nur eine Cloud-Integration existiert, sollte die Empfehlung klar als cloudabhängig markiert werden.",
-        "Zigbee": "Der nächste sinnvolle Pfad ist die Entscheidung zwischen ZHA und Zigbee2MQTT. Ohne Coordinator und MQTT-Grundlage sollten keine Geräteschritte gestartet werden.",
-        "Matter": "Matter ist passend, wenn die Matter-Infrastruktur bereits steht. Bei Thread-Geräten ist der Border Router die entscheidende Voraussetzung.",
-        "Bluetooth": "Bluetooth eignet sich für nahe Geräte oder mit Bluetooth-Proxies. Ohne stabile Reichweite ist WLAN, Zigbee oder Matter oft robuster.",
-        "LAN": "LAN ist meist der stabilste lokale Pfad. Wichtig ist, ob der Hersteller eine lokale Integration oder dokumentierte API anbietet.",
-        "Hersteller-Bridge": "Die Bridge übernimmt Pairing und Funknetz. Home Assistant sollte zuerst die Bridge integrieren, erst danach werden einzelne Geräte sichtbar.",
-    },
-}
+def build_decision_tree(lang):
+    return {
+        "categories": [{**category, "title": t(lang, f"category.{category['id']}")} for category in CATEGORIES],
+        "connections": [{"id": connection, "title": t(lang, f"connection.{connection}")} for connection in CONNECTIONS],
+        "infrastructure": {
+            connection: [
+                {
+                    "id": check_id,
+                    "capability": capability,
+                    "label": t(lang, f"infra.{connection}.{check_id}.label"),
+                    "question": t(lang, f"infra.{connection}.{check_id}.question"),
+                    "action": t(lang, f"infra.{connection}.{check_id}.action"),
+                }
+                for check_id, capability in checks
+            ]
+            for connection, checks in INFRASTRUCTURE.items()
+        },
+        "recommendations": {connection: t(lang, f"recommendation.{connection}") for connection in CONNECTIONS},
+        "ha_status": DEFAULT_HA_STATUS,
+        "home_assistant_status": offline_home_assistant_status(lang),
+    }
 
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request, "tree": DECISION_TREE, "app_version": APP_VERSION})
+    lang = resolve_language(request)
+    response = templates.TemplateResponse(
+        "index.html",
+        {
+            "request": request,
+            "tree": build_decision_tree(lang),
+            "app_version": APP_VERSION,
+            "lang": lang,
+            "i18n": {"lang": lang, "strings": strings(lang)},
+            "t": lambda key, **params: t(lang, key, **params),
+        },
+    )
+    if normalize_language(request.query_params.get("lang")):
+        response.set_cookie(LANGUAGE_COOKIE, lang, max_age=365 * 24 * 3600, samesite="lax")
+    return response
 
 
 @app.get("/api/decision-tree")
-async def decision_tree():
-    return DECISION_TREE
+async def decision_tree(request: Request):
+    return build_decision_tree(resolve_language(request))
 
 
 @app.get("/api/home-assistant-status")
-async def home_assistant_status():
+async def home_assistant_status(request: Request):
+    lang = resolve_language(request)
     url, token = configured_home_assistant()
     if not url or not token:
-        return {"ha_status": DEFAULT_HA_STATUS, "home_assistant_status": DECISION_TREE["home_assistant_status"]}
+        return {"ha_status": DEFAULT_HA_STATUS, "home_assistant_status": offline_home_assistant_status(lang)}
 
     try:
         states = fetch_home_assistant_states(url, token)
         services = fetch_home_assistant_services(url, token)
     except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, json.JSONDecodeError):
-        return {"ha_status": DEFAULT_HA_STATUS, "home_assistant_status": DECISION_TREE["home_assistant_status"]}
+        return {"ha_status": DEFAULT_HA_STATUS, "home_assistant_status": offline_home_assistant_status(lang)}
 
     infrastructure = detect_infrastructure(states, services)
     return {
         "ha_status": infrastructure,
         "home_assistant_status": {
-            "source": "Live Home-Assistant-Analyse",
+            "source": t(lang, "status.source_live"),
             "capabilities": build_capability_map(infrastructure, connected=True),
         },
     }
 
 
 @app.get("/api/home-assistant-scan")
-async def home_assistant_scan():
-    return fetch_home_assistant_analysis()
+async def home_assistant_scan(request: Request):
+    return fetch_home_assistant_analysis(resolve_language(request))
 
 
 @app.get("/api/home-assistant-token-status")
-async def home_assistant_token_status():
+async def home_assistant_token_status(request: Request):
+    lang = resolve_language(request)
     url, token = configured_home_assistant()
     connected = False
     error = None
     if url and token:
-        result = test_home_assistant_connection(url, token)
+        result = test_home_assistant_connection(url, token, lang)
         connected = result["ok"]
         error = result["error"]
     return {
@@ -1017,17 +650,18 @@ async def home_assistant_token_status():
 
 
 @app.post("/api/home-assistant-token")
-async def set_home_assistant_token(payload: HomeAssistantTokenRequest):
+async def set_home_assistant_token(payload: HomeAssistantTokenRequest, request: Request):
     global RUNTIME_HOME_ASSISTANT_URL
     global RUNTIME_HOME_ASSISTANT_TOKEN
+    lang = resolve_language(request)
     url = (payload.url or os.environ.get("HOME_ASSISTANT_URL") or "").strip().rstrip("/")
     token = payload.token.strip()
     if not url:
-        return {"ok": False, "error": "Home Assistant nicht erreichbar"}
+        return {"ok": False, "error": t(lang, "error.ha_unreachable")}
     if not token:
-        return {"ok": False, "error": "Home Assistant Token fehlt"}
+        return {"ok": False, "error": t(lang, "error.ha_token_missing")}
 
-    test_result = test_home_assistant_connection(url, token)
+    test_result = test_home_assistant_connection(url, token, lang)
     if not test_result["ok"]:
         return test_result
 
@@ -1044,18 +678,19 @@ DEVICE_LIKE_DOMAINS = {
 
 
 @app.post("/api/home-assistant/zigbee/permit-join")
-async def home_assistant_zigbee_permit_join(payload: ZigbeePermitJoinRequest | None = None):
+async def home_assistant_zigbee_permit_join(request: Request, payload: ZigbeePermitJoinRequest | None = None):
     global LAST_ZIGBEE_PAIRING_STARTED_AT
     global PAIRING_KNOWN_ENTITY_IDS
     payload = payload or ZigbeePermitJoinRequest()
     duration = max(30, min(payload.duration, 300))
-    ready, error = home_assistant_action_ready()
+    lang = resolve_language(request)
+    ready, error = home_assistant_action_ready(lang)
     if not ready:
         return {
             "ok": False,
             "status": "not_connected",
             "error": error,
-            "message": "Automatischer Suchmodus ist vorbereitet, aber Home Assistant ist noch nicht verbunden.",
+            "message": t(lang, "pairing.api.not_connected_message"),
             "home_assistant_url": home_assistant_devices_url(),
         }
 
@@ -1067,8 +702,8 @@ async def home_assistant_zigbee_permit_join(payload: ZigbeePermitJoinRequest | N
         return {
             "ok": False,
             "status": "error",
-            "error": "Home Assistant nicht erreichbar",
-            "message": "Suchmodus konnte nicht gestartet werden, Home Assistant ist gerade nicht erreichbar.",
+            "error": t(lang, "error.ha_unreachable"),
+            "message": t(lang, "pairing.api.unreachable_message"),
             "home_assistant_url": home_assistant_devices_url(),
         }
 
@@ -1087,8 +722,8 @@ async def home_assistant_zigbee_permit_join(payload: ZigbeePermitJoinRequest | N
                     return {
                         "ok": False,
                         "status": "error",
-                        "error": "Zigbee-Coordinator hat nicht rechtzeitig reagiert",
-                        "message": "Der Suchmodus-Befehl wurde an Zigbee2MQTT gesendet, aber der Zigbee-Coordinator hat innerhalb weniger Sekunden nicht bestätigt, dass der Suchmodus aktiv ist. Das deutet auf ein Coordinator-/Firmware-Problem hin, nicht auf ein SmartGuide-Problem — Zigbee2MQTT-Logs auf dem Host prüfen.",
+                        "error": t(lang, "pairing.api.coordinator_timeout_error"),
+                        "message": t(lang, "pairing.api.coordinator_timeout_message"),
                         "home_assistant_url": home_assistant_devices_url(),
                     }
             else:
@@ -1103,24 +738,24 @@ async def home_assistant_zigbee_permit_join(payload: ZigbeePermitJoinRequest | N
             return {
                 "ok": False,
                 "status": "no_zigbee_stack",
-                "error": "Kein Zigbee-Coordinator (ZHA oder Zigbee2MQTT) erkannt.",
-                "message": "SmartGuide kennt die Home-Assistant-Verbindung, findet darin aber weder ZHA noch Zigbee2MQTT. Der Suchmodus kann so nicht automatisch gestartet werden.",
+                "error": t(lang, "pairing.api.no_stack_error"),
+                "message": t(lang, "pairing.api.no_stack_message"),
                 "home_assistant_url": home_assistant_devices_url(),
             }
     except urllib.error.HTTPError as exc:
         return {
             "ok": False,
             "status": "error",
-            "error": f"Home Assistant lehnte den Service-Aufruf ab (HTTP {exc.code})",
-            "message": "Suchmodus konnte nicht gestartet werden.",
+            "error": t(lang, "pairing.api.service_rejected", code=exc.code),
+            "message": t(lang, "pairing.api.start_failed"),
             "home_assistant_url": home_assistant_devices_url(),
         }
     except (urllib.error.URLError, TimeoutError):
         return {
             "ok": False,
             "status": "error",
-            "error": "Home Assistant nicht erreichbar",
-            "message": "Suchmodus konnte nicht gestartet werden, Home Assistant ist gerade nicht erreichbar.",
+            "error": t(lang, "error.ha_unreachable"),
+            "message": t(lang, "pairing.api.unreachable_message"),
             "home_assistant_url": home_assistant_devices_url(),
         }
 
@@ -1130,7 +765,7 @@ async def home_assistant_zigbee_permit_join(payload: ZigbeePermitJoinRequest | N
         "ok": True,
         "status": "started",
         "backend": backend,
-        "message": f"Suchmodus wurde über {backend} für {duration} Sekunden gestartet.",
+        "message": t(lang, "pairing.api.started", backend=backend, duration=duration),
         "duration": duration,
         "started_at": LAST_ZIGBEE_PAIRING_STARTED_AT,
         "home_assistant_url": home_assistant_devices_url(),
@@ -1138,8 +773,9 @@ async def home_assistant_zigbee_permit_join(payload: ZigbeePermitJoinRequest | N
 
 
 @app.get("/api/home-assistant/devices/recent")
-async def home_assistant_recent_devices():
-    ready, error = home_assistant_action_ready()
+async def home_assistant_recent_devices(request: Request):
+    lang = resolve_language(request)
+    ready, error = home_assistant_action_ready(lang)
     if not ready:
         return {
             "ok": False,
@@ -1156,7 +792,7 @@ async def home_assistant_recent_devices():
         return {
             "ok": False,
             "status": "scan_failed",
-            "error": "Home Assistant nicht erreichbar",
+            "error": t(lang, "error.ha_unreachable"),
             "items": [],
             "home_assistant_url": home_assistant_devices_url(),
         }
@@ -1165,7 +801,7 @@ async def home_assistant_recent_devices():
         return {
             "ok": True,
             "status": "unknown",
-            "message": "Noch kein Suchmodus gestartet, es gibt keinen Vergleichszeitpunkt für neue Geräte.",
+            "message": t(lang, "pairing.api.no_baseline"),
             "items": [],
             "started_at": LAST_ZIGBEE_PAIRING_STARTED_AT,
             "home_assistant_url": home_assistant_devices_url(),
@@ -1182,7 +818,7 @@ async def home_assistant_recent_devices():
         return {
             "ok": True,
             "status": "unknown",
-            "message": "Noch kein neues Gerät gefunden. Home Assistant hat seit Suchmodus-Start keine neue Entität für diese Domänen gemeldet.",
+            "message": t(lang, "pairing.api.nothing_new"),
             "items": [],
             "started_at": LAST_ZIGBEE_PAIRING_STARTED_AT,
             "home_assistant_url": home_assistant_devices_url(),
@@ -1199,19 +835,8 @@ async def home_assistant_recent_devices():
     return {
         "ok": True,
         "status": "found",
-        "message": f"{len(items)} neue Entität(en) seit Suchmodus-Start gefunden.",
+        "message": tn(lang, "pairing.api.found", len(items)),
         "items": items,
         "started_at": LAST_ZIGBEE_PAIRING_STARTED_AT,
         "home_assistant_url": home_assistant_devices_url(),
     }
-
-
-@app.get("/api/device-database")
-async def device_database():
-    return {"devices": DEVICE_DATABASE}
-
-
-@app.get("/api/compatibility-check")
-async def compatibility_check_api(category: str, manufacturer: str, model: str, connection: str):
-    status = await home_assistant_status()
-    return compatibility_check(category, manufacturer, model, connection, status["ha_status"])
