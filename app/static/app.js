@@ -1,5 +1,6 @@
 const tree = JSON.parse(document.getElementById("treeData").textContent);
 const i18n = JSON.parse(document.getElementById("i18nData").textContent);
+const appConfig = JSON.parse(document.getElementById("appConfig").textContent);
 
 function t(key, params = {}) {
   const text = i18n.strings[key] ?? key;
@@ -116,7 +117,7 @@ function renderHaAnalysis(result) {
       <div class="analysis-error">
         <span class="analysis-symbol">${icons.alert}</span>
         <strong>${result.error}</strong>
-        ${result.needs_connection ? renderConnectionFormMarkup(result.default_url) : ""}
+        ${result.needs_connection && !appConfig.managed_connection ? renderConnectionFormMarkup(result.default_url) : ""}
       </div>
     `;
     bindConnectionForm();
@@ -138,7 +139,7 @@ function renderHaAnalysis(result) {
           <strong>${t("analysis.connected")}</strong>
           <small>${t("analysis.last_scan", { time: formatAnalysisTime(analysis.scanned_at) })}</small>
         </div>
-        <button class="secondary" type="button" id="changeConnectionBtn">${t("analysis.change_connection")}</button>
+        ${appConfig.managed_connection ? "" : `<button class="secondary" type="button" id="changeConnectionBtn">${t("analysis.change_connection")}</button>`}
       </div>
       <h3 class="recognition-title">${t("analysis.recognized_title")}</h3>
       <div class="simple-insights">
@@ -293,7 +294,7 @@ function bindAnalysisDetails() {
     changeButton.addEventListener("click", async () => {
       state.liveHaStatus = null;
       state.liveCapabilities = null;
-      const response = await fetch("/api/home-assistant-token-status");
+      const response = await fetch("api/home-assistant-token-status");
       const status = await response.json();
       renderHaAnalysis({
         ok: false,
@@ -351,7 +352,7 @@ async function searchKnowledgeDevices(query) {
   deviceSearchResults.innerHTML = "";
 
   try {
-    const response = await fetch(`/devices/search?q=${encodeURIComponent(trimmed)}`);
+    const response = await fetch(`devices/search?q=${encodeURIComponent(trimmed)}`);
     if (!response.ok) throw new Error(t("error.api_unreachable"));
     const result = await response.json();
     if (!result.ok) {
@@ -401,7 +402,7 @@ async function loadDeviceDetails(deviceId) {
   deviceDetailPanel.innerHTML = `<div class="detail-loading"><span class="analysis-spinner"></span><strong>${t("device.loading_details")}</strong></div>`;
 
   try {
-    const response = await fetch(`/devices/${encodeURIComponent(deviceId)}`);
+    const response = await fetch(`devices/${encodeURIComponent(deviceId)}`);
     if (!response.ok) throw new Error(t("error.api_unreachable"));
     const result = await response.json();
     if (!result.ok) {
@@ -515,7 +516,7 @@ function bindConnectionForm() {
     haAnalysisState.innerHTML = `<span class="analysis-spinner"></span><strong>${t("analysis.running")}</strong>`;
 
     try {
-      const response = await fetch("/api/home-assistant-token", {
+      const response = await fetch("api/home-assistant-token", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url, token }),
@@ -543,7 +544,7 @@ async function loadHomeAssistantAnalysis() {
   haAnalysisState.className = "analysis-state";
   haAnalysisState.innerHTML = `<span class="analysis-spinner"></span><strong>${t("analysis.running")}</strong>`;
   try {
-    const response = await fetch("/api/home-assistant-scan");
+    const response = await fetch("api/home-assistant-scan");
     renderHaAnalysis(await response.json());
   } catch (error) {
     renderHaAnalysis({ ok: false, error: t("error.ha_unreachable"), needs_connection: false, analysis: null });
@@ -553,7 +554,7 @@ async function loadHomeAssistantAnalysis() {
 async function initializeHomeAssistantAnalysis() {
   if (!haAnalysisState) return;
   try {
-    const response = await fetch("/api/home-assistant-token-status");
+    const response = await fetch("api/home-assistant-token-status");
     const status = await response.json();
     if (!status.connected) {
       renderHaAnalysis({
@@ -727,7 +728,7 @@ function renderKnowledgeContext() {
 async function loadKnowledgeVendors() {
   if (knowledgeWizard.vendors) return;
   try {
-    const response = await fetch("/vendors");
+    const response = await fetch("vendors");
     if (!response.ok) throw new Error(t("error.api_unreachable"));
     const result = await response.json();
     if (!result.ok) throw new Error(result.error || t("error.api_unreachable"));
@@ -743,7 +744,7 @@ async function loadKnowledgeVendors() {
 async function loadKnowledgeDevicesForVendor(vendor) {
   if (!vendor || knowledgeWizard.devicesByVendor[vendor] || knowledgeWizard.devicesErrorByVendor[vendor]) return;
   try {
-    const response = await fetch(`/devices/by-vendor?vendor=${encodeURIComponent(vendor)}`);
+    const response = await fetch(`devices/by-vendor?vendor=${encodeURIComponent(vendor)}`);
     if (!response.ok) throw new Error(t("error.api_unreachable"));
     const result = await response.json();
     if (!result.ok) throw new Error(result.error || t("error.api_unreachable"));
@@ -763,7 +764,7 @@ async function selectKnowledgeDevice(device) {
   state.infrastructureAnswers = {};
   resetPairingState();
   try {
-    const response = await fetch(`/devices/${encodeURIComponent(device.device_id)}`);
+    const response = await fetch(`devices/${encodeURIComponent(device.device_id)}`);
     if (response.ok) {
       const result = await response.json();
       if (result.ok) {
@@ -1007,7 +1008,9 @@ function pairingInstructionText() {
 function renderPairingFlow(evaluation) {
   const wrap = document.createElement("section");
   wrap.className = `pairing-flow ${state.pairing.phase}`;
-  const haUrl = state.pairing.homeAssistantUrl || "http://homeassistant.local:8123/config/devices/dashboard";
+  const haUrl =
+    state.pairing.homeAssistantUrl ||
+    (appConfig.managed_connection ? "/config/devices/dashboard" : "http://homeassistant.local:8123/config/devices/dashboard");
   wrap.innerHTML = `
     <div class="pairing-head">
       <span>${icons.radio}</span>
@@ -1077,7 +1080,7 @@ async function startZigbeePairing() {
   state.pairing.message = "";
   render();
   try {
-    const response = await fetch("/api/home-assistant/zigbee/permit-join", {
+    const response = await fetch("api/home-assistant/zigbee/permit-join", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ duration: 120 }),
@@ -1091,7 +1094,7 @@ async function startZigbeePairing() {
       return;
     }
 
-    const recentResponse = await fetch("/api/home-assistant/devices/recent");
+    const recentResponse = await fetch("api/home-assistant/devices/recent");
     const recent = await recentResponse.json();
     state.pairing.homeAssistantUrl = recent.home_assistant_url || state.pairing.homeAssistantUrl;
     if (recent.ok && recent.items?.length) {

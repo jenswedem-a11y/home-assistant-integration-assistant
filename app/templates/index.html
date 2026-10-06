@@ -4,14 +4,14 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Smart Guide</title>
-    <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v={{ app_version }}" />
+    <link rel="stylesheet" href="static/styles.css?v={{ app_version }}" />
   </head>
   <body>
     <div class="app-shell">
       <main class="content">
         <section class="topbar">
           <div>
-            <a class="brand" href="/" aria-label="{{ t('page.brand_aria') }}">
+            <a class="brand" href="./" aria-label="{{ t('page.brand_aria') }}">
               <span class="brand-mark">SG</span>
               <span>
                 <strong>Smart Guide</strong>
@@ -133,6 +133,7 @@
 
     <script id="treeData" type="application/json">{{ tree | tojson }}</script>
     <script id="i18nData" type="application/json">{{ i18n | tojson }}</script>
-    <script src="{{ url_for('static', path='app.js') }}?v={{ app_version }}"></script>
+    <script id="appConfig" type="application/json">{{ app_config | tojson }}</script>
+    <script src="static/app.js?v={{ app_version }}"></script>
   </body>
 </html>

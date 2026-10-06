@@ -136,6 +136,7 @@
   "error.ha_token_missing": "Home Assistant token missing",
   "error.ha_token_invalid": "Token invalid or expired",
   "error.ha_unreachable": "Home Assistant unreachable",
+  "error.managed_connection": "The Home Assistant connection is managed by the add-on.",
   "error.api_unreachable": "API unreachable",
   "error.catalog_missing": "Device catalog not found: {path}",
 

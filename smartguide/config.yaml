@@ -1,0 +1,14 @@
+name: SmartGuide
+version: "0.9.0"
+slug: smartguide
+description: Guided smart home device onboarding - find out if and how a device fits into your Home Assistant setup, then pair it.
+url: https://github.com/jenswedem-a11y/home-assistant-integration-assistant
+arch:
+  - aarch64
+  - amd64
+image: ghcr.io/jenswedem-a11y/smartguide-{arch}
+ingress: true
+ingress_port: 8080
+panel_icon: mdi:robot
+panel_title: SmartGuide
+homeassistant_api: true

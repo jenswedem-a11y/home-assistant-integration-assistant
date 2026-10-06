@@ -8,22 +8,37 @@ import urllib.request
 
 from fastapi import FastAPI, Request
 from pydantic import BaseModel
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from app.i18n import LANGUAGE_COOKIE, normalize_language, resolve_language, strings, t, tn
 from app.search import router as search_router
 
-APP_VERSION = "0.8.0"
+APP_VERSION = "0.9.0"
 
 app = FastAPI(title="Smart Guide", version=APP_VERSION)
 app.include_router(search_router)
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
+
+
+@app.middleware("http")
+async def ingress_only(request: Request, call_next):
+    # Add-on requirement: only the Ingress proxy may talk to the app.
+    if ADDON_MODE and (request.client is None or request.client.host != INGRESS_PROXY_IP):
+        return PlainTextResponse("Forbidden", status_code=403)
+    return await call_next(request)
 templates = Jinja2Templates(directory="app/templates")
 
 CONFIG_PATH = Path(os.environ.get("SMART_GUIDE_CONFIG_PATH", "/app/data/ha_config.json"))
+
+# As a Home Assistant add-on, the Supervisor injects a token for its Core API
+# proxy and serves the UI through Ingress; no manual connection setup needed.
+SUPERVISOR_TOKEN = os.environ.get("SUPERVISOR_TOKEN")
+ADDON_MODE = bool(SUPERVISOR_TOKEN)
+SUPERVISOR_CORE_URL = "http://supervisor/core"
+INGRESS_PROXY_IP = "172.30.32.2"
 RUNTIME_HOME_ASSISTANT_URL = None
 RUNTIME_HOME_ASSISTANT_TOKEN = None
 LAST_ANALYSIS_AT = None
@@ -288,7 +303,7 @@ def scan_home_assistant_states(states, infrastructure=None):
 
     LAST_ANALYSIS_AT = datetime.now(timezone.utc).isoformat()
     summary["scanned_at"] = LAST_ANALYSIS_AT
-    summary["home_assistant_url"] = (os.environ.get("HOME_ASSISTANT_URL") or RUNTIME_HOME_ASSISTANT_URL or "").rstrip("/")
+    summary["home_assistant_url"] = home_assistant_browser_url() or ("/" if ADDON_MODE else "")
     summary["translator"] = translator
     summary["ha_status"] = infrastructure
     return summary
@@ -427,8 +442,7 @@ def call_home_assistant_service(base_url, token, domain, service, data=None):
 
 
 def fetch_home_assistant_analysis(lang):
-    base_url = (os.environ.get("HOME_ASSISTANT_URL") or RUNTIME_HOME_ASSISTANT_URL or "").rstrip("/")
-    token = os.environ.get("HOME_ASSISTANT_TOKEN") or RUNTIME_HOME_ASSISTANT_TOKEN
+    base_url, token = configured_home_assistant()
 
     if not base_url:
         return {"ok": False, "error": t(lang, "error.ha_not_connected"), "needs_connection": True, "analysis": None}
@@ -480,15 +494,27 @@ def test_home_assistant_connection(base_url, token, lang):
 
 
 def configured_home_assistant():
+    if ADDON_MODE:
+        return SUPERVISOR_CORE_URL, SUPERVISOR_TOKEN
     return (
         (os.environ.get("HOME_ASSISTANT_URL") or RUNTIME_HOME_ASSISTANT_URL or "").rstrip("/"),
         os.environ.get("HOME_ASSISTANT_TOKEN") or RUNTIME_HOME_ASSISTANT_TOKEN,
     )
 
 
-def home_assistant_devices_url():
+def home_assistant_browser_url():
+    """Home Assistant URL for links in the browser (not for API calls)."""
+    if ADDON_MODE:
+        # Ingress serves SmartGuide from the Home Assistant origin itself.
+        return ""
     url, _ = configured_home_assistant()
-    base_url = url or os.environ.get("HOME_ASSISTANT_URL") or "http://homeassistant.local:8123"
+    return url
+
+
+def home_assistant_devices_url():
+    base_url = home_assistant_browser_url()
+    if not base_url and not ADDON_MODE:
+        base_url = "http://homeassistant.local:8123"
     return f"{base_url.rstrip('/')}/config/devices/dashboard"
 
 
@@ -588,11 +614,14 @@ async def index(request: Request):
             "app_version": APP_VERSION,
             "lang": lang,
             "i18n": {"lang": lang, "strings": strings(lang)},
+            "app_config": {"managed_connection": ADDON_MODE},
             "t": lambda key, **params: t(lang, key, **params),
         },
     )
     if normalize_language(request.query_params.get("lang")):
-        response.set_cookie(LANGUAGE_COOKIE, lang, max_age=365 * 24 * 3600, samesite="lax")
+        # Behind Ingress, scope the cookie to this add-on's path on the HA origin.
+        cookie_path = request.headers.get("x-ingress-path") or "/"
+        response.set_cookie(LANGUAGE_COOKIE, lang, max_age=365 * 24 * 3600, samesite="lax", path=cookie_path)
     return response
 
 
@@ -640,6 +669,7 @@ async def home_assistant_token_status(request: Request):
         connected = result["ok"]
         error = result["error"]
     return {
+        "managed": ADDON_MODE,
         "has_url": bool(url),
         "has_token": bool(token),
         "connected": connected,
@@ -654,6 +684,8 @@ async def set_home_assistant_token(payload: HomeAssistantTokenRequest, request: 
     global RUNTIME_HOME_ASSISTANT_URL
     global RUNTIME_HOME_ASSISTANT_TOKEN
     lang = resolve_language(request)
+    if ADDON_MODE:
+        return {"ok": False, "error": t(lang, "error.managed_connection")}
     url = (payload.url or os.environ.get("HOME_ASSISTANT_URL") or "").strip().rstrip("/")
     token = payload.token.strip()
     if not url:

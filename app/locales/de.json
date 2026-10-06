@@ -136,6 +136,7 @@
   "error.ha_token_missing": "Home Assistant Token fehlt",
   "error.ha_token_invalid": "Token ungültig oder abgelaufen",
   "error.ha_unreachable": "Home Assistant nicht erreichbar",
+  "error.managed_connection": "Die Home-Assistant-Verbindung wird vom Add-on verwaltet.",
   "error.api_unreachable": "API nicht erreichbar",
   "error.catalog_missing": "Gerätedatenbank nicht gefunden: {path}",
 
